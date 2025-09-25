@@ -3,14 +3,15 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Lesson JSON Translation Editor — v1.7.1</title>
+  <title>Lesson JSON Translation Editor — v1.8.0</title>
   <style>
-    :root{ --brand:#081A35; --muted:#6b7280; --ok:#16a34a; --warn:#e11d48; --line:#e5e7eb; }
-    html,body{margin:0;padding:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Inter,Arial,sans-serif;background:#f5f7fb;color:#0f172a}
+    :root{ --brand:#081A35; --muted:#6b7280; --ok:#16a34a; --warn:#e11d48; --line:#e5e7eb; --bg:#f5f7fb; }
+    html,body{margin:0;padding:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Inter,Arial,sans-serif;background:var(--bg);color:#0f172a}
     header{padding:16px 20px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:10}
     header h1{font-size:18px;margin:0 0 4px 0;color:var(--brand);display:flex;gap:10px;align-items:center}
     header .ver{font-size:11px;color:#fff;background:#0f172a;border-radius:999px;padding:2px 8px}
-    header .sub{color:var(--muted);font-size:13px}
+    header .sub{color:var(--muted);font-size:13px;display:flex;gap:12px;flex-wrap:wrap}
+    .b{font-weight:600;color:#0f172a}
 
     .container{max-width:1200px;margin:0 auto;padding:16px}
     .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
@@ -27,19 +28,18 @@
 
     .status{font-size:12px;color:var(--muted)}
     .pill{display:inline-block;border-radius:999px;padding:2px 8px;font-size:12px;border:1px solid var(--line);background:#fff}
+    .qhdr{background:#eef2ff;border-left:4px solid #4f46e5;padding:6px 8px;margin:6px 0;border-radius:6px;font-size:13px;color:#1f2937}
 
     table{width:100%;border-collapse:separate;border-spacing:0;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
     thead th{position:sticky;top:64px;background:#f9fafb;border-bottom:1px solid var(--line);font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:#334155;padding:8px}
     tbody td{border-bottom:1px solid var(--line);vertical-align:top;padding:8px}
     tbody tr:nth-child(odd){background:#fcfdff}
-    .path{font-family:ui-monospace,Consolas,monospace;font-size:12px;white-space:nowrap;max-width:420px;overflow:hidden;text-overflow:ellipsis}
+    .item{font-size:13px}
     .base, .loc{min-width:260px}
     textarea.edit{width:100%;min-height:60px;resize:vertical;font-family:inherit}
-    .len{color:#475569;font-size:12px}
-    .missing{color:#e11d48;font-weight:600}
-    .ok{color:#16a34a;font-weight:600}
+    .len{color:#475569;font-size:12px;text-align:right}
 
-    .footer{display:flex;gap:10px;justify-content:flex-end;margin-top:12px}
+    .footer{display:flex;gap:10px;justify-content:space-between;margin-top:12px;align-items:center}
     .counter{font-size:12px;color:#334155}
   </style>
 </head>
@@ -47,10 +47,11 @@
   <header>
     <h1>
       Lesson JSON Translation Editor
-      <span class="ver">v1.7.1</span>
+      <span class="ver">v1.8.0</span>
     </h1>
     <div class="sub">
-      Deep-link with <code>?lang=sv_SE</code>. Use <code>?showMeta=1</code> to show explanation/right/wrong rows.
+      <span>Deep-link with <code>?lang=sv_SE</code> • <code>?showMeta=1</code> shows explanation/right/wrong</span>
+      <span id="qTotal" class="b"></span>
     </div>
   </header>
 
@@ -84,7 +85,7 @@
       <label>Base (comparison)
         <select id="baseSelect"></select>
       </label>
-      <input id="search" type="text" placeholder="Search in path or text…" />
+      <input id="search" type="text" placeholder="Search item text…" />
       <label class="chk"><input type="checkbox" id="missingOnly"/> Show missing/empty only</label>
       <label class="chk"><input type="checkbox" id="ensureKeys"/> Ensure keys exist for selected locale when exporting/saving</label>
       <label class="chk"><input type="checkbox" id="hideMeta"/> Hide explanation/right/wrong</label>
@@ -95,11 +96,10 @@
       <thead>
         <tr>
           <th style="width:36px">#</th>
-          <th>Path</th>
+          <th>Item</th>
           <th>Base</th>
           <th>Locale</th>
-          <th style="width:120px">Len</th>
-          <th style="width:100px">Status</th>
+          <th style="width:120px;text-align:right">Len</th>
         </tr>
       </thead>
       <tbody id="tbody"></tbody>
@@ -107,12 +107,16 @@
 
     <div class="footer">
       <span class="counter" id="footerCounts">—</span>
+      <span class="counter" id="visibleQ">—</span>
     </div>
   </div>
 
 <script>
 (() => {
-  const VERSION = 'v1.7.1';
+  // ---------- Config / Version ----------
+  const VERSION = 'v1.8.0';
+
+  // ---------- DOM / utils ----------
   const $ = (s, r = document) => r.querySelector(s);
   const isLocaleKey = (k) => k === 'basic' || /^[a-z]{2}_[A-Z]{2}$/.test(k);
 
@@ -133,6 +137,7 @@
   const GITHUB = { owner:'johanpantzare', repo:'video-course', branch:'master', path:'translation.json', token:'', sha:'' };
 
   let LESSON = null, RECORDS = [], LOCALES = new Set(), WRAPPER = { has:false, before:'', after:'' };
+  let QINFO = []; // per-question meta: {id, type, answersCount}
 
   function download(filename, text, type='application/json'){
     const a = document.createElement('a');
@@ -142,8 +147,8 @@
   }
   function downloadCSV(filename, rows){
     const esc = (s) => '"' + (String(s??'').replaceAll('"','""')) + '"';
-    const header = ['#','path','baseLocale','base','locale','value'].map(esc).join(',');
-    const lines = rows.map(r => [r.idx, r.path, r.baseLocale, r.base, r.locale, r.value].map(esc).join(','));
+    const header = ['#','question','item','path','baseLocale','base','locale','value'].map(esc).join(',');
+    const lines = rows.map(r => [r.idx, r.qnum, r.item, r.path, r.baseLocale, r.base, r.locale, r.value].map(esc).join(','));
     const csv = [header, ...lines].join('\n');
     download(filename, csv, 'text/csv');
   }
@@ -169,13 +174,34 @@
     });
   }
 
-  // Build rows: questions.* + answers[].body
+  // Nice label for UI (instead of full path)
+  function labelFor(rec){
+    if (rec.meta?.kind === 'answer'){
+      return `Answer ${Number(rec.meta.position)+1}`;
+    }
+    const f = rec.meta?.field;
+    if (f === 'text') return 'Question';
+    if (f === 'title') return 'Title';
+    if (f === 'explanationText') return 'Explanation';
+    if (f === 'rightAnswerText') return 'Right answer text';
+    if (f === 'wrongAnswerText') return 'Wrong answer text';
+    return f || rec.path;
+  }
+
+  // Build rows: questions.* + answers[].body (store question index & answer position)
   function collectTranslatables(obj){
     const FIELDS = ['title','text','explanationText','rightAnswerText','wrongAnswerText'];
     const recs = [];
     const questions = Array.isArray(obj.questions)
       ? obj.questions
       : (obj.lessonData && Array.isArray(obj.lessonData.questions) ? obj.lessonData.questions : []);
+
+    QINFO = questions.map(q => ({
+      id: q?.id ?? '',
+      type: q?.questionType ?? '',
+      answersCount: Array.isArray(q?.answers) ? q.answers.length : 0
+    }));
+
     questions.forEach((q, i) => {
       FIELDS.forEach(field => {
         const node = q?.[field];
@@ -184,7 +210,7 @@
           if (keys.some(isLocaleKey)){
             const locales = keys.filter(isLocaleKey);
             const baseLocale = locales.includes('en_US') ? 'en_US' : (locales.includes('basic') ? 'basic' : locales[0]);
-            recs.push({ path: `questions[${i}].${field}`, node, baseLocale, meta:{kind:'question', field} });
+            recs.push({ qIndex:i, path:`questions[${i}].${field}`, node, baseLocale, meta:{kind:'question', field} });
           }
         }
       });
@@ -196,7 +222,7 @@
           if (keys.some(isLocaleKey)){
             const locales = keys.filter(isLocaleKey);
             const baseLocale = locales.includes('en_US') ? 'en_US' : (locales.includes('basic') ? 'basic' : locales[0]);
-            recs.push({ path: `questions[${i}].answers[${j}].body`, node, baseLocale, meta:{kind:'answer', isCorrect: ans?.isCorrect === true} });
+            recs.push({ qIndex:i, path:`questions[${i}].answers[${j}].body`, node, baseLocale, meta:{kind:'answer', isCorrect: ans?.isCorrect === true, position:j} });
           }
         }
       });
@@ -230,89 +256,132 @@
     const base = $('#baseSelect').value;
     const q = $('#search').value.trim().toLowerCase();
     const missingOnly = $('#missingOnly').checked;
-    const hideMeta = $('#hideMeta').checked; // NEW: hide explanation/right/wrong entirely
+    const hideMeta = $('#hideMeta').checked;
 
     const tbody = document.getElementById('tbody');
     const grid = document.getElementById('grid');
     tbody.innerHTML = '';
 
+    // Group records by question index
+    const byQ = new Map();
+    for (const rec of RECORDS){
+      if (hideMeta && /\.(explanationText|rightAnswerText|wrongAnswerText)$/.test(rec.path)) continue;
+      (byQ.get(rec.qIndex) || byQ.set(rec.qIndex, []).get(rec.qIndex)).push(rec);
+    }
+    // Sort items inside each question: Title, Question, Answers..., Explanation, Right, Wrong
+    const orderKey = (rec) => {
+      if (rec.meta?.kind === 'answer') return 200 + (rec.meta.position ?? 0);
+      const f = rec.meta?.field;
+      if (f === 'title') return 10;
+      if (f === 'text') return 20;
+      if (f === 'explanationText') return 500;
+      if (f === 'rightAnswerText') return 510;
+      if (f === 'wrongAnswerText') return 520;
+      return 999;
+    };
+    for (const arr of byQ.values()) arr.sort((a,b)=>orderKey(a)-orderKey(b));
+
     let idx = 0, shown = 0, missing = 0;
     const rowsForCSV = [];
+    const visibleQuestions = new Set();
 
-    for (const rec of RECORDS){
-      // Filter out meta fields if requested
-      if (hideMeta && /\.(explanationText|rightAnswerText|wrongAnswerText)$/.test(rec.path)) continue;
-
-      idx++;
-      const baseText = rec.node?.[base] ?? '';
-      const locText = rec.node?.[locale] ?? '';
-
-      const isMissing = (locText ?? '') === '';
-      if (isMissing) missing++;
-
-      const hay = (rec.path + ' ' + baseText + ' ' + locText).toLowerCase();
-      if (q && !hay.includes(q)) continue;
-      if (missingOnly && !isMissing) continue;
-
-      shown++;
-
-      const tr = document.createElement('tr');
-      const tdIdx = document.createElement('td'); tdIdx.textContent = String(idx); tr.appendChild(tdIdx);
-
-      const tdPath = document.createElement('td'); tdPath.className = 'path'; tdPath.title = rec.path; tdPath.textContent = rec.path;
-      if (rec.meta?.kind === 'answer' && rec.meta.isCorrect){
-        const pill = document.createElement('span');
-        pill.className = 'pill'; pill.textContent = 'Correct'; pill.style.marginLeft = '6px';
-        tdPath.appendChild(pill);
+    // Build rows with question headers
+    const totalQuestions = QINFO.length;
+    for (let qi = 0; qi < totalQuestions; qi++){
+      const recs = byQ.get(qi) || [];
+      // Determine if any row in this question will be shown after search/missing filter
+      let hasVisibleRow = false;
+      for (const rec of recs){
+        const baseText = rec.node?.[base] ?? '';
+        const locText = rec.node?.[locale] ?? '';
+        const isMissing = (locText ?? '') === '';
+        const hay = (labelFor(rec) + ' ' + baseText + ' ' + locText).toLowerCase();
+        if (q && !hay.includes(q)) continue;
+        if (missingOnly && !isMissing) continue;
+        hasVisibleRow = true; break;
       }
-      tr.appendChild(tdPath);
+      if (!hasVisibleRow) continue;
 
-      const tdBase = document.createElement('td'); tdBase.className = 'base';
-      const baseArea = document.createElement('div'); baseArea.textContent = baseText; tdBase.appendChild(baseArea); tr.appendChild(tdBase);
+      // Question header row (spans all columns)
+      const qmeta = QINFO[qi] || {};
+      const qRow = document.createElement('tr');
+      const qCell = document.createElement('td');
+      qCell.colSpan = 5;
+      qCell.className = 'qhdr';
+      qCell.innerHTML = `Question ${qi+1} of ${totalQuestions}  •  ID ${qmeta.id ?? ''}  •  ${qmeta.type || ''}`;
+      qRow.appendChild(qCell);
+      tbody.appendChild(qRow);
 
-      const tdLoc = document.createElement('td'); tdLoc.className = 'loc';
-      const ta = document.createElement('textarea');
-      ta.className = 'edit'; ta.value = locText ?? '';
+      visibleQuestions.add(qi);
 
-      // Keep collapsible behavior if user unhides meta later
-      const collapseByDefault = /\.(explanationText|rightAnswerText|wrongAnswerText)$/.test(rec.path);
-      if (collapseByDefault){
-        ta.style.height = '22px';
-        ta.style.overflow = 'hidden';
-        ta.style.resize = 'none';
-        ta.addEventListener('focus', () => {
-          ta.style.height = '60px';
-          ta.style.overflow = 'auto';
-          ta.style.resize = 'vertical';
-        }, {once:true});
+      // Now render each item row
+      for (const rec of recs){
+        const baseText = rec.node?.[base] ?? '';
+        const locText = rec.node?.[locale] ?? '';
+        const isMissing = (locText ?? '') === '';
+        if (isMissing) missing++;
+
+        const hay = (labelFor(rec) + ' ' + baseText + ' ' + locText).toLowerCase();
+        if (q && !hay.includes(q)) continue;
+        if (missingOnly && !isMissing) continue;
+
+        shown++; idx++;
+
+        const tr = document.createElement('tr');
+
+        const tdIdx = document.createElement('td'); tdIdx.textContent = String(idx); tr.appendChild(tdIdx);
+
+        const tdItem = document.createElement('td'); tdItem.className = 'item';
+        const label = document.createElement('span'); label.textContent = labelFor(rec);
+        tdItem.appendChild(label);
+        if (rec.meta?.kind === 'answer' && rec.meta.isCorrect){
+          const pill = document.createElement('span');
+          pill.className = 'pill'; pill.textContent = 'Correct'; pill.style.marginLeft = '6px';
+          tdItem.appendChild(pill);
+        }
+        tr.appendChild(tdItem);
+
+        const tdBase = document.createElement('td'); tdBase.className = 'base';
+        const baseArea = document.createElement('div'); baseArea.textContent = baseText; tdBase.appendChild(baseArea); tr.appendChild(tdBase);
+
+        const tdLoc = document.createElement('td'); tdLoc.className = 'loc';
+        const ta = document.createElement('textarea');
+        ta.className = 'edit'; ta.value = locText ?? '';
+        // Keep collapsible behavior for meta fields in case user unhides them
+        const collapseByDefault = /\.(explanationText|rightAnswerText|wrongAnswerText)$/.test(rec.path);
+        if (collapseByDefault){
+          ta.style.height = '22px';
+          ta.style.overflow = 'hidden';
+          ta.style.resize = 'none';
+          ta.addEventListener('focus', () => {
+            ta.style.height = '60px';
+            ta.style.overflow = 'auto';
+            ta.style.resize = 'vertical';
+          }, {once:true});
+        }
+        ta.addEventListener('input', (e) => {
+          rec.node[locale] = e.target.value; // bind live
+          updateCounts();
+          tdLen.textContent = String(e.target.value.length);
+        });
+        tdLoc.appendChild(ta); tr.appendChild(tdLoc);
+
+        const tdLen = document.createElement('td'); tdLen.className = 'len'; tdLen.textContent = String((ta.value||'').length); tr.appendChild(tdLen);
+
+        tbody.appendChild(tr);
+
+        rowsForCSV.push({ idx, qnum: qi+1, item: labelFor(rec), path: rec.path, baseLocale: base, base: baseText, locale, value: ta.value });
       }
-
-      ta.addEventListener('input', (e) => {
-        rec.node[locale] = e.target.value;
-        updateCounts();
-        tdLen.innerHTML = `<span class="len">${e.target.value.length}</span>`;
-        tdStatus.innerHTML = (e.target.value.trim()==='')?`<span class="missing">Missing</span>`:`<span class="ok">OK</span>`;
-      });
-      tdLoc.appendChild(ta); tr.appendChild(tdLoc);
-
-      const tdLen = document.createElement('td'); tdLen.innerHTML = `<span class="len">${(ta.value||'').length}</span>`; tr.appendChild(tdLen);
-
-      const tdStatus = document.createElement('td');
-      tdStatus.innerHTML = (ta.value.trim()==='')? `<span class="missing">Missing</span>` : `<span class="ok">OK</span>`;
-      tr.appendChild(tdStatus);
-
-      tbody.appendChild(tr);
-
-      rowsForCSV.push({ idx, path: rec.path, baseLocale: base, base: baseText, locale, value: ta.value });
     }
 
     grid.hidden = false;
-    document.getElementById('counts').textContent = `${shown} rows · ${missing} missing`;
-    document.getElementById('footerCounts').textContent = `${RECORDS.length} total translatable bundles · showing ${shown} rows`;
-    grid.dataset.csv = JSON.stringify(rowsForCSV);
+    $('#counts').textContent = `${shown} items · ${missing} missing in ${$('#localeSelect').value}`;
+    $('#footerCounts').textContent = `${RECORDS.length} total translatable items`;
+    $('#visibleQ').textContent = `${visibleQuestions.size} / ${QINFO.length} questions visible`;
   }
 
   function updateCounts(){
+    // Recompute quickly from current table (simpler and accurate with filters)
     const locale = $('#localeSelect').value;
     const hideMeta = $('#hideMeta').checked;
     let missing = 0, total = 0;
@@ -321,7 +390,7 @@
       total++;
       if ((rec.node?.[locale]??'') === '') missing++;
     }
-    document.getElementById('counts').textContent = `${total} rows · ${missing} missing in ${locale}`;
+    $('#counts').textContent = `${total} items · ${missing} missing in ${locale}`;
   }
 
   function extractLessonFromText(text){
@@ -363,6 +432,10 @@
     RECORDS = collectTranslatables(LESSON);
     populateLocaleSelects();
 
+    // Show total questions prominently
+    const totalQ = Array.isArray(LESSON.questions) ? LESSON.questions.length : 0;
+    $('#qTotal').textContent = `${totalQ} questions detected`;
+
     // Apply ?lang=
     try{
       const urlParams = new URLSearchParams(location.search);
@@ -381,10 +454,10 @@
     renderTable();
   }
 
-  // UI bindings
-  document.getElementById('btnLoadTextarea').addEventListener('click', () => {
+  // ---------- UI buttons ----------
+  $('#btnLoadTextarea').addEventListener('click', () => {
     try{
-      const raw = document.getElementById('jsonInput').value.trim();
+      const raw = $('#jsonInput').value.trim();
       if (!raw) { alert('Paste JSON first.'); return; }
       const {lesson, wrapper} = extractLessonFromText(raw);
       WRAPPER = wrapper;
@@ -394,9 +467,9 @@
     }
   });
 
-  document.getElementById('btnDownload').addEventListener('click', () => {
-    const ensure = document.getElementById('ensureKeys').checked;
-    const locale = document.getElementById('localeSelect').value;
+  $('#btnDownload').addEventListener('click', () => {
+    const ensure = $('#ensureKeys').checked;
+    const locale = $('#localeSelect').value;
     if (!LESSON){ alert('Load JSON first.'); return; }
     if (ensure){ for (const rec of RECORDS){ if (!(locale in rec.node)) rec.node[locale] = rec.node?.en_US ?? rec.node?.basic ?? ''; } }
     const json = JSON.stringify(LESSON, null, 2);
@@ -408,26 +481,26 @@
     }
   });
 
-  document.getElementById('btnCSV').addEventListener('click', () => {
-    const grid = document.getElementById('grid');
+  $('#btnCSV').addEventListener('click', () => {
+    const grid = $('#grid');
     const rows = JSON.parse(grid.dataset.csv || '[]');
     if (!rows.length){ alert('Nothing to export. Load JSON first.'); return; }
     downloadCSV('lesson_strings.csv', rows);
   });
 
-  document.getElementById('localeSelect').addEventListener('change', () => {
+  $('#localeSelect').addEventListener('change', () => {
     setUrlLangParam($('#localeSelect').value);
     renderTable(); updateCounts();
   });
-  document.getElementById('baseSelect').addEventListener('change', () => { renderTable(); updateCounts(); });
-  document.getElementById('missingOnly').addEventListener('change', () => { renderTable(); updateCounts(); });
-  document.getElementById('search').addEventListener('input', renderTable);
-  document.getElementById('hideMeta').addEventListener('change', () => { renderTable(); updateCounts(); });
+  $('#baseSelect').addEventListener('change', () => { renderTable(); updateCounts(); });
+  $('#missingOnly').addEventListener('change', () => { renderTable(); updateCounts(); });
+  $('#search').addEventListener('input', renderTable);
+  $('#hideMeta').addEventListener('change', () => { renderTable(); updateCounts(); });
 
-  // GitHub integration
-  const ghStatus = (msg) => { document.getElementById('ghStatus').textContent = msg || ''; };
+  // ---------- GitHub integration ----------
+  const ghStatus = (msg) => { $('#ghStatus').textContent = msg || ''; };
   function ghReadToken(){
-    GITHUB.token = document.getElementById('ghToken').value.trim();
+    GITHUB.token = $('#ghToken').value.trim();
     try { localStorage.setItem('ghToken', GITHUB.token || ''); } catch {}
   }
   async function withAuthTry(fn){
@@ -460,7 +533,7 @@
       if (!data.content){ ghStatus('No content in response.'); return; }
       GITHUB.sha = data.sha;
       const text = fromB64Utf8(data.content);
-      document.getElementById('jsonInput').value = text;
+      $('#jsonInput').value = text;
       try {
         const {lesson, wrapper} = extractLessonFromText(text);
         WRAPPER = wrapper;
@@ -472,8 +545,8 @@
   async function githubSave(){
     ghReadToken(); ghStatus('Saving…');
     if (!LESSON){ ghStatus('Load JSON before saving.'); return; }
-    const ensure = document.getElementById('ensureKeys').checked;
-    const locale = document.getElementById('localeSelect').value;
+    const ensure = $('#ensureKeys').checked;
+    const locale = $('#localeSelect').value;
     if (ensure){ for (const rec of RECORDS){ if (!(locale in rec.node)) rec.node[locale] = rec.node?.en_US ?? rec.node?.basic ?? ''; } }
     const json = JSON.stringify(LESSON, null, 2);
     const contentText = WRAPPER.has ? ('var lessonData = ' + json + ';\n') : json;
@@ -502,8 +575,8 @@
       ghStatus('Saved ✔');
     });
   }
-  document.getElementById('btnGHLoad').addEventListener('click', () => { githubLoad().catch(e=>ghStatus('Load error: '+e.message)); });
-  document.getElementById('btnGHSave').addEventListener('click', () => { githubSave().catch(e=>ghStatus('Save error: '+e.message)); });
+  $('#btnGHLoad').addEventListener('click', () => { githubLoad().catch(e=>ghStatus('Load error: '+e.message)); });
+  $('#btnGHSave').addEventListener('click', () => { githubSave().catch(e=>ghStatus('Save error: '+e.message)); });
 
   // Paste-to-load anywhere
   window.addEventListener('paste', (e) => {
@@ -522,23 +595,26 @@
   });
 
   function debounced(fn, ms=400){ let t; return (...args)=>{ clearTimeout(t); t=setTimeout(()=>fn(...args), ms); }; }
-  const tokenInput = document.getElementById('ghToken');
+  const tokenInput = $('#ghToken');
   tokenInput.addEventListener('input', debounced(() => { ghReadToken(); if (GITHUB.token) githubLoad().catch(e=>ghStatus('Load error: '+e.message)); }, 500));
 
-  // Init: auto-load; set default hideMeta = ON unless ?showMeta=1
+  // Init auto-load
   (function initAutoLoad(){
-    // default hide
+    // default hide meta unless ?showMeta=1
     try{
       const p = new URLSearchParams(location.search);
       const showMeta = p.get('showMeta');
       $('#hideMeta').checked = !(showMeta === '1' || showMeta === 'true');
     }catch{}
+
     // globals
     if (typeof window.LESSON !== 'undefined') { try { loadFromJSONObj(window.LESSON); ghStatus('Loaded from global LESSON ✔'); return; } catch {} }
     if (typeof window.lessonData !== 'undefined') { try { loadFromJSONObj(window.lessonData); ghStatus('Loaded from global lessonData ✔'); return; } catch {} }
+
     // textarea
     const raw = $('#jsonInput').value.trim();
     if (raw) { try { const {lesson, wrapper} = extractLessonFromText(raw); WRAPPER = wrapper; loadFromJSONObj(lesson); ghStatus('Loaded from textarea ✔'); return; } catch {} }
+
     // GitHub via saved token
     try {
       const saved = localStorage.getItem('ghToken') || '';
