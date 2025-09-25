@@ -5,9 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Lesson JSON Translation Editor</title>
   <style>
-    :root{
-      --brand:#081A35;--muted:#6b7280;--ok:#16a34a;--warn:#e11d48;--line:#e5e7eb;
-    }
+    :root{ --brand:#081A35; --muted:#6b7280; --ok:#16a34a; --warn:#e11d48; --line:#e5e7eb; }
     html,body{margin:0;padding:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Inter,Arial,sans-serif;background:#f5f7fb;color:#0f172a}
     header{padding:16px 20px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:10}
     header h1{font-size:18px;margin:0 0 4px 0;color:var(--brand)}
@@ -16,7 +14,7 @@
     .container{max-width:1200px;margin:0 auto;padding:16px}
     .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
     .toolbar > * {flex:0 0 auto}
-    select, input[type="text"], textarea, button{
+    select, input[type="text"], input[type="password"], textarea, button{
       border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:#fff;font:inherit
     }
     button{cursor:pointer}
@@ -39,8 +37,8 @@
     .base, .loc{min-width:260px}
     textarea.edit{width:100%;min-height:60px;resize:vertical;font-family:inherit}
     .len{color:#475569;font-size:12px}
-    .missing{color:var(--warn);font-weight:600}
-    .ok{color:var(--ok);font-weight:600}
+    .missing{color:#e11d48;font-weight:600}
+    .ok{color:#16a34a;font-weight:600}
 
     .footer{display:flex;gap:10px;justify-content:flex-end;margin-top:12px}
     .counter{font-size:12px;color:#334155}
@@ -49,21 +47,42 @@
 <body>
   <header>
     <h1>Lesson JSON Translation Editor</h1>
-    <div class="sub">Paste your <code>lessonData</code> JSON and let proofreaders edit strings per language. Exports the updated JSON.</div>
+    <div class="sub">Proofread only the question fields and push changes to GitHub. Supports raw JSON or <code>var/let/const lessonData = {…};</code>.</div>
   </header>
 
   <div class="container">
     <details class="config" open>
       <summary>Load / Paste JSON</summary>
       <div style="display:grid;gap:8px">
-        <div class="status">Tip: If this page is embedded where <code>window.lessonData</code> already exists, click “Load from window.lessonData”. Otherwise paste the raw JSON below and click “Load JSON”.</div>
+        <div class="status">Tip: If this page is embedded where <code>window.lessonData</code> already exists, click “Load from window.lessonData”. Otherwise paste the file contents and click “Load JSON”. This also accepts files that begin with <code>var lessonData =</code>.</div>
         <div class="toolbar">
           <button id="btnLoadWindow" class="ghost">Load from <code>window.lessonData</code></button>
           <button id="btnLoadTextarea" class="primary">Load JSON</button>
           <button id="btnDownload" class="ghost">Export Updated JSON</button>
           <button id="btnCSV" class="ghost">Export CSV (visible)</button>
         </div>
-        <textarea id="jsonInput" placeholder='Paste the JSON for your lesson here (either the object itself or {"lessonData": ...}).'></textarea>
+        <textarea id="jsonInput" placeholder='Paste the JSON for your lesson here (either the object itself, {"lessonData": ...}, or a JS file like "var lessonData = {...};").'></textarea>
+      </div>
+    </details>
+
+    <details class="config">
+      <summary>Connect to GitHub (load & save JSON)</summary>
+      <div style="display:grid;gap:8px">
+        <div class="status">Uses GitHub REST API. Your token is only sent to GitHub from this page and can be stored locally if you choose. For private repos use a fine‑grained token with <em>Contents: Read & Write</em>. Default path is <code>translation.json</code> at repo root.</div>
+        <div class="toolbar" style="flex-wrap:wrap;gap:8px">
+          <input id="ghOwner" placeholder="owner (e.g. my-org)" />
+          <input id="ghRepo" placeholder="repo (e.g. training-content)" />
+          <input id="ghBranch" placeholder="branch (e.g. main)" />
+          <input id="ghPath" placeholder="path (e.g. translation.json)" style="min-width:260px" value="translation.json" />
+          <input id="ghToken" placeholder="personal access token (PAT)" type="password" style="min-width:260px" />
+          <label class="chk"><input type="checkbox" id="ghRemember"/> Remember on this device</label>
+        </div>
+        <div class="toolbar">
+          <input id="ghMessage" type="text" placeholder="Commit message (e.g. fix sv_SE translations)" style="min-width:320px" />
+          <button id="btnGHLoad" class="ghost">Load from GitHub</button>
+          <button id="btnGHSave" class="primary">Save to GitHub</button>
+          <span id="ghStatus" class="status"></span>
+        </div>
       </div>
     </details>
 
@@ -78,6 +97,7 @@
       <label class="chk"><input type="checkbox" id="missingOnly"/> Show missing/empty only</label>
       <label class="chk"><input type="checkbox" id="ensureKeys"/> Ensure keys exist for selected locale when exporting</label>
       <span id="counts" class="counter">—</span>
+      <label class="chk"><input type="checkbox" id="preserveWrapper"/> Save with <code>var lessonData = …;</code></label>
     </div>
 
     <table id="grid" hidden>
@@ -124,25 +144,19 @@
   }
 
   // ————— State —————
-  let LESSON = null;             // the full JSON object
+  let LESSON = null;             // the full JSON object (either raw or lessonData)
   let RECORDS = [];              // flat list of translatable entries
   let LOCALES = new Set();       // discovered locales
   const GITHUB = { owner:'', repo:'', branch:'', path:'', token:'', sha:'' };
-  let WRAPPER = { has:false, before:'', after:'' };       // discovered locales
+  let WRAPPER = { has:false, before:'', after:'' }; // if the source had var/let/const wrapper
 
   // ————— Discovery —————
   function collectLocales(obj){
-    // 1) from lesson.languages if available
-    try{
-      (obj.languages||[]).forEach(x => x?.locale && LOCALES.add(x.locale));
-    }catch{}
-    // 2) from any translatable object keys
+    try{ (obj.languages||[]).forEach(x => x?.locale && LOCALES.add(x.locale)); }catch{}
     traverse(obj, (node) => {
       if (node && typeof node === 'object' && !Array.isArray(node)){
         const keys = Object.keys(node);
-        if (keys.some(isLocaleKey)){
-          keys.filter(isLocaleKey).forEach(k => LOCALES.add(k));
-        }
+        if (keys.some(isLocaleKey)) keys.filter(isLocaleKey).forEach(k => LOCALES.add(k));
       }
     });
   }
@@ -160,7 +174,6 @@
 
   function collectTranslatables(obj){
     // Only parse the specified fields within questions[*]
-    // questions[i].{title,text,explanationText,rightAnswerText,wrongAnswerText}
     const FIELDS = ['title','text','explanationText','rightAnswerText','wrongAnswerText'];
     const recs = [];
     const questions = Array.isArray(obj.questions) ? obj.questions : (obj.lessonData && Array.isArray(obj.lessonData.questions) ? obj.lessonData.questions : []);
@@ -246,7 +259,6 @@
     $('#counts').textContent = `${shown} rows · ${missing} missing`;
     $('#footerCounts').textContent = `${RECORDS.length} total translatable bundles · showing ${shown} rows`;
 
-    // Store for CSV export of visible state
     grid.dataset.csv = JSON.stringify(rowsForCSV);
   }
 
@@ -260,7 +272,6 @@
       const o1 = document.createElement('option'); o1.value = l; o1.textContent = l; sel.appendChild(o1);
       const o2 = document.createElement('option'); o2.value = l; o2.textContent = l; baseSel.appendChild(o2);
     }
-    // sensible defaults
     sel.value = locs.includes('sv_SE') ? 'sv_SE' : (locs.includes('en_US')?'en_US':locs[0]||'en_US');
     baseSel.value = locs.includes('en_US') ? 'en_US' : (locs.includes('basic')?'basic':locs[0]||'en_US');
   }
@@ -273,12 +284,38 @@
     $('#counts').textContent = `${total} rows · ${missing} missing in ${locale}`;
   }
 
+  // ————— Wrapper-aware parsing (accepts JS assignment) —————
+  function normalizeRaw(raw){
+    const s = String(raw||'').trim();
+    const first = s.indexOf('{');
+    const last  = s.lastIndexOf('}');
+    if (first === -1 || last === -1 || last <= first){
+      return { jsonText: s, wrapper: { has:false, before:'', after:'' } };
+    }
+    const before = s.slice(0, first).replace(/\s+/g,' ').trim();
+    const after  = s.slice(last+1).trim();
+    const assigned = before.startsWith('var lessonData =') || before.startsWith('let lessonData =') || before.startsWith('const lessonData =');
+    const onlySemis = after.replace(/[\s;]/g,'') === '';
+    if (assigned && onlySemis){
+      return { jsonText: s.slice(first, last+1), wrapper: { has:true, before: s.slice(0, first), after: s.slice(last+1) } };
+    }
+    return { jsonText: s, wrapper: { has:false, before:'', after:'' } };
+  }
+
+  function parseAndLoad(raw){
+    const { jsonText, wrapper } = normalizeRaw(raw);
+    WRAPPER = wrapper;
+    const parsed = JSON.parse(jsonText);
+    loadFromJSONObj(parsed);
+    const cb = document.getElementById('preserveWrapper');
+    if (cb) cb.checked = WRAPPER.has;
+  }
+
   // ————— Loaders —————
   function loadFromJSONObj(obj){
     LESSON = obj.lessonData || obj; // allow either wrapper or direct object
     if (!LESSON || typeof LESSON !== 'object') throw new Error('Could not find a valid object. Paste either the lesson object or {"lessonData": ...}');
 
-    // Reset
     RECORDS = []; LOCALES = new Set();
 
     collectLocales(LESSON);
@@ -303,10 +340,9 @@
     try{
       const raw = $('#jsonInput').value.trim();
       if (!raw) { alert('Paste JSON first.'); return; }
-      const obj = JSON.parse(raw);
-      loadFromJSONObj(obj);
+      parseAndLoad(raw);
     } catch (e) {
-      alert('Invalid JSON: ' + e.message);
+      alert('Invalid JSON/JS: ' + e.message);
     }
   });
 
@@ -316,7 +352,13 @@
     if (ensure){
       for (const rec of RECORDS){ if (!(locale in rec.node)) rec.node[locale] = rec.node?.en_US ?? rec.node?.basic ?? ''; }
     }
-    download('lessonData.updated.json', JSON.stringify(LESSON, null, 2));
+    const preserve = document.getElementById('preserveWrapper').checked;
+    let content = JSON.stringify(LESSON, null, 2);
+    if (preserve && WRAPPER.has){
+      // preserve exact wrapper syntax we saw
+      content = WRAPPER.before + content + WRAPPER.after;
+    }
+    download('translation.updated.json', content);
   });
 
   $('#btnCSV').addEventListener('click', () => {
@@ -331,26 +373,24 @@
   $('#missingOnly').addEventListener('change', renderTable);
   $('#search').addEventListener('input', () => { renderTable(); });
 
-  // ————— Demo seed (optional) —————
-  // If you want this file to open with a tiny demo, you can assign window.lessonDataRaw to a JSON string externally
-}  // ————— GitHub integration —————
+  // ————— GitHub integration —————
   const ghStatus = (msg) => { document.getElementById('ghStatus').textContent = msg || ''; };
   const b64 = (str) => { return btoa(unescape(encodeURIComponent(str))); };
   const fromB64 = (b64str) => decodeURIComponent(escape(atob(b64str)));
 
   function ghReadInputs(){
-    GITHUB.owner = document.getElementById('ghOwner').value.trim();
-    GITHUB.repo = document.getElementById('ghRepo').value.trim();
+    GITHUB.owner  = document.getElementById('ghOwner').value.trim();
+    GITHUB.repo   = document.getElementById('ghRepo').value.trim();
     GITHUB.branch = document.getElementById('ghBranch').value.trim() || 'main';
-    GITHUB.path = document.getElementById('ghPath').value.trim();
-    GITHUB.token = document.getElementById('ghToken').value.trim();
+    GITHUB.path   = document.getElementById('ghPath').value.trim() || 'translation.json';
+    GITHUB.token  = document.getElementById('ghToken').value.trim();
   }
   function ghWriteInputs(){
-    document.getElementById('ghOwner').value = GITHUB.owner;
-    document.getElementById('ghRepo').value = GITHUB.repo;
+    document.getElementById('ghOwner').value  = GITHUB.owner;
+    document.getElementById('ghRepo').value   = GITHUB.repo;
     document.getElementById('ghBranch').value = GITHUB.branch || '';
-    document.getElementById('ghPath').value = GITHUB.path;
-    document.getElementById('ghToken').value = GITHUB.token;
+    document.getElementById('ghPath').value   = GITHUB.path || 'translation.json';
+    document.getElementById('ghToken').value  = GITHUB.token;
   }
   function ghLoadLocal(){
     try{
@@ -358,6 +398,7 @@
       Object.assign(GITHUB, saved);
       ghWriteInputs();
       if (saved.token) document.getElementById('ghRemember').checked = true;
+      if (!GITHUB.path) document.getElementById('ghPath').value = 'translation.json';
     }catch{}
   }
   function ghPersistLocal(){
@@ -377,7 +418,7 @@
     GITHUB.sha = data.sha;
     const text = fromB64(data.content);
     document.getElementById('jsonInput').value = text;
-    try { loadFromJSONObj(JSON.parse(text)); ghStatus('Loaded from GitHub.'); }
+    try { parseAndLoad(text); ghStatus('Loaded from GitHub.'); }
     catch(e){ ghStatus('Fetched, but JSON parse failed: ' + e.message); }
   }
 
@@ -388,12 +429,17 @@
     const locale = document.getElementById('localeSelect').value;
     if (ensure){ for (const rec of RECORDS){ if (!(locale in rec.node)) rec.node[locale] = rec.node?.en_US ?? rec.node?.basic ?? ''; } }
 
+    const preserve = document.getElementById('preserveWrapper').checked;
+    let content = JSON.stringify(LESSON, null, 2);
+    if (preserve && WRAPPER.has){ content = WRAPPER.before + content + WRAPPER.after; }
+
     const commitMessage = (document.getElementById('ghMessage').value || 'Update lesson translations').trim();
-    const body = { message: commitMessage, content: b64(JSON.stringify(LESSON, null, 2)), branch: GITHUB.branch || 'main' };
-    if (GITHUB.sha) body.sha = GITHUB.sha;
+    const body = { message: commitMessage, content: b64(content), branch: GITHUB.branch || 'main' };
+    if (GITHUB.sha) body.sha = GITHUB.sha; // required for updates
 
     const url = `https://api.github.com/repos/${encodeURIComponent(GITHUB.owner)}/${encodeURIComponent(GITHUB.repo)}/contents/${GITHUB.path}`;
     const res = await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json', ...(GITHUB.token ? { Authorization: `Bearer ${GITHUB.token}` } : {}) }, body: JSON.stringify(body) });
+
     if (!res.ok){ const err = await res.json().catch(()=>({message:res.statusText})); ghStatus(`Save failed (${res.status}): ${err.message || 'Unknown error'}`); return; }
     const out = await res.json(); GITHUB.sha = out.content?.sha || GITHUB.sha; ghStatus('Saved to GitHub ✔');
   }
@@ -402,7 +448,6 @@
   document.getElementById('btnGHSave').addEventListener('click', () => { githubSave().catch(e=>ghStatus('Save error: '+e.message)); });
 
   ghLoadLocal();
-
 })();
 </script>
 </body>
