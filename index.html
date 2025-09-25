@@ -3,12 +3,13 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Lesson JSON Translation Editor</title>
+  <title>Lesson JSON Translation Editor — v1.7.0</title>
   <style>
     :root{ --brand:#081A35; --muted:#6b7280; --ok:#16a34a; --warn:#e11d48; --line:#e5e7eb; }
     html,body{margin:0;padding:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Inter,Arial,sans-serif;background:#f5f7fb;color:#0f172a}
     header{padding:16px 20px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:10}
-    header h1{font-size:18px;margin:0 0 4px 0;color:var(--brand)}
+    header h1{font-size:18px;margin:0 0 4px 0;color:var(--brand);display:flex;gap:10px;align-items:center}
+    header .ver{font-size:11px;color:#fff;background:#0f172a;border-radius:999px;padding:2px 8px}
     header .sub{color:var(--muted);font-size:13px}
 
     .container{max-width:1200px;margin:0 auto;padding:16px}
@@ -44,14 +45,20 @@
 </head>
 <body>
   <header>
-    <h1>Lesson JSON Translation Editor</h1>
-    <div class="sub">Now includes <code>answers[j].body</code>. Also parses files that start with <code>var/let/const lessonData = …</code>.</div>
+    <h1>
+      Lesson JSON Translation Editor
+      <span class="ver">v1.7.0</span>
+    </h1>
+    <div class="sub">
+      Includes <code>answers[j].body</code>. Collapses <code>explanationText</code>, <code>rightAnswerText</code>, <code>wrongAnswerText</code>.
+      Use <code>?lang=sv_SE</code> to deep-link a language.
+    </div>
   </header>
 
   <div class="container">
     <details class="box" open>
       <summary>Load / Paste JSON</summary>
-      <div class="status">Auto-load tries: global <code>LESSON</code>/<code>lessonData</code> → textarea → GitHub (if token saved). You can also paste JSON anywhere on the page.</div>
+      <div class="status">Auto-load: global <code>LESSON</code>/<code>lessonData</code> → textarea → GitHub (if saved PAT). You can also paste JSON anywhere on the page.</div>
       <div class="toolbar">
         <button id="btnLoadTextarea" class="ghost">Load JSON from textarea</button>
         <button id="btnDownload" class="ghost">Export Updated JSON</button>
@@ -62,7 +69,7 @@
 
     <details class="box" open>
       <summary>GitHub</summary>
-      <div class="status">Repo details are preconfigured. Enter your <strong>Personal Access Token</strong> (fine-grained or classic). Auto-save token to localStorage for next visit.</div>
+      <div class="status">Repo details are preconfigured. Enter your <strong>Personal Access Token</strong> (fine-grained or classic). Token is saved to localStorage for auto-load next visit.</div>
       <div class="toolbar">
         <input id="ghToken" type="password" placeholder="Personal Access Token" style="min-width:320px" />
         <button id="btnGHLoad" class="ghost">Load from GitHub</button>
@@ -105,6 +112,9 @@
 
 <script>
 (() => {
+  // ---------- Config / Version ----------
+  const VERSION = 'v1.7.0';
+
   // ---------- DOM / utils ----------
   const $ = (s, r = document) => r.querySelector(s);
   const isLocaleKey = (k) => k === 'basic' || /^[a-z]{2}_[A-Z]{2}$/.test(k);
@@ -230,90 +240,98 @@
     baseSel.value = locs.includes('en_US') ? 'en_US' : (locs.includes('basic')?'basic':locs[0]||'en_US');
   }
 
- function renderTable(){
-  const locale = $('#localeSelect').value;
-  const base = $('#baseSelect').value;
-  const q = $('#search').value.trim().toLowerCase();
-  const missingOnly = $('#missingOnly').checked;
-
-  const tbody = document.getElementById('tbody');
-  const grid = document.getElementById('grid');
-  tbody.innerHTML = '';
-
-  let idx = 0, shown = 0, missing = 0;
-  const rowsForCSV = [];
-
-  for (const rec of RECORDS){
-    idx++;
-    const baseText = rec.node?.[base] ?? '';
-    const locText = rec.node?.[locale] ?? '';
-
-    const isMissing = (locText ?? '') === '';
-    if (isMissing) missing++;
-
-    const hay = (rec.path + ' ' + baseText + ' ' + locText).toLowerCase();
-    if (q && !hay.includes(q)) continue;
-    if (missingOnly && !isMissing) continue;
-
-    shown++;
-
-    const tr = document.createElement('tr');
-    const tdIdx = document.createElement('td'); tdIdx.textContent = String(idx); tr.appendChild(tdIdx);
-
-    const tdPath = document.createElement('td'); tdPath.className = 'path'; tdPath.title = rec.path; tdPath.textContent = rec.path;
-    if (rec.meta?.kind === 'answer' && rec.meta.isCorrect){
-      const pill = document.createElement('span');
-      pill.className = 'pill'; pill.textContent = 'Correct'; pill.style.marginLeft = '6px';
-      tdPath.appendChild(pill);
-    }
-    tr.appendChild(tdPath);
-
-    const tdBase = document.createElement('td'); tdBase.className = 'base';
-    const baseArea = document.createElement('div'); baseArea.textContent = baseText; tdBase.appendChild(baseArea); tr.appendChild(tdBase);
-
-    const tdLoc = document.createElement('td'); tdLoc.className = 'loc';
-    const ta = document.createElement('textarea');
-    ta.className = 'edit'; ta.value = locText ?? '';
-
-    // --- Collapse by default for certain fields ---
-    const collapseByDefault = /\.(explanationText|rightAnswerText|wrongAnswerText)$/.test(rec.path);
-    if (collapseByDefault){
-      ta.style.height = '22px';
-      ta.style.overflow = 'hidden';
-      ta.style.resize = 'none';
-      ta.addEventListener('focus', () => {
-        ta.style.height = '60px';
-        ta.style.overflow = 'auto';
-        ta.style.resize = 'vertical';
-      }, {once:true});
-    }
-
-    ta.addEventListener('input', (e) => {
-      rec.node[locale] = e.target.value; // bind live
-      updateCounts();
-      tdLen.innerHTML = `<span class="len">${e.target.value.length}</span>`;
-      tdStatus.innerHTML = (e.target.value.trim()==='')?`<span class="missing">Missing</span>`:`<span class="ok">OK</span>`;
-    });
-    tdLoc.appendChild(ta); tr.appendChild(tdLoc);
-
-    const tdLen = document.createElement('td'); tdLen.innerHTML = `<span class="len">${(ta.value||'').length}</span>`; tr.appendChild(tdLen);
-
-    const tdStatus = document.createElement('td');
-    tdStatus.innerHTML = (ta.value.trim()==='')? `<span class="missing">Missing</span>` : `<span class="ok">OK</span>`;
-    tr.appendChild(tdStatus);
-
-    tbody.appendChild(tr);
-
-    rowsForCSV.push({ idx, path: rec.path, baseLocale: base, base: baseText, locale, value: ta.value });
+  // --- update ?lang= in URL (no reload) ---
+  function setUrlLangParam(lang){
+    try{
+      const u = new URL(location.href);
+      if (lang) u.searchParams.set('lang', lang); else u.searchParams.delete('lang');
+      history.replaceState(null, '', u.toString());
+    }catch{}
   }
 
-  grid.hidden = false;
-  document.getElementById('counts').textContent = `${shown} rows · ${missing} missing`;
-  document.getElementById('footerCounts').textContent = `${RECORDS.length} total translatable bundles · showing ${shown} rows`;
+  function renderTable(){
+    const locale = $('#localeSelect').value;
+    const base = $('#baseSelect').value;
+    const q = $('#search').value.trim().toLowerCase();
+    const missingOnly = $('#missingOnly').checked;
 
-  grid.dataset.csv = JSON.stringify(rowsForCSV);
-}
+    const tbody = document.getElementById('tbody');
+    const grid = document.getElementById('grid');
+    tbody.innerHTML = '';
 
+    let idx = 0, shown = 0, missing = 0;
+    const rowsForCSV = [];
+
+    for (const rec of RECORDS){
+      idx++;
+      const baseText = rec.node?.[base] ?? '';
+      const locText = rec.node?.[locale] ?? '';
+
+      const isMissing = (locText ?? '') === '';
+      if (isMissing) missing++;
+
+      const hay = (rec.path + ' ' + baseText + ' ' + locText).toLowerCase();
+      if (q && !hay.includes(q)) continue;
+      if (missingOnly && !isMissing) continue;
+
+      shown++;
+
+      const tr = document.createElement('tr');
+      const tdIdx = document.createElement('td'); tdIdx.textContent = String(idx); tr.appendChild(tdIdx);
+
+      const tdPath = document.createElement('td'); tdPath.className = 'path'; tdPath.title = rec.path; tdPath.textContent = rec.path;
+      if (rec.meta?.kind === 'answer' && rec.meta.isCorrect){
+        const pill = document.createElement('span');
+        pill.className = 'pill'; pill.textContent = 'Correct'; pill.style.marginLeft = '6px';
+        tdPath.appendChild(pill);
+      }
+      tr.appendChild(tdPath);
+
+      const tdBase = document.createElement('td'); tdBase.className = 'base';
+      const baseArea = document.createElement('div'); baseArea.textContent = baseText; tdBase.appendChild(baseArea); tr.appendChild(tdBase);
+
+      const tdLoc = document.createElement('td'); tdLoc.className = 'loc';
+      const ta = document.createElement('textarea');
+      ta.className = 'edit'; ta.value = locText ?? '';
+
+      // Collapse by default for certain fields
+      const collapseByDefault = /\.(explanationText|rightAnswerText|wrongAnswerText)$/.test(rec.path);
+      if (collapseByDefault){
+        ta.style.height = '22px';
+        ta.style.overflow = 'hidden';
+        ta.style.resize = 'none';
+        ta.addEventListener('focus', () => {
+          ta.style.height = '60px';
+          ta.style.overflow = 'auto';
+          ta.style.resize = 'vertical';
+        }, {once:true});
+      }
+
+      ta.addEventListener('input', (e) => {
+        rec.node[locale] = e.target.value; // bind live
+        updateCounts();
+        tdLen.innerHTML = `<span class="len">${e.target.value.length}</span>`;
+        tdStatus.innerHTML = (e.target.value.trim()==='')?`<span class="missing">Missing</span>`:`<span class="ok">OK</span>`;
+      });
+      tdLoc.appendChild(ta); tr.appendChild(tdLoc);
+
+      const tdLen = document.createElement('td'); tdLen.innerHTML = `<span class="len">${(ta.value||'').length}</span>`; tr.appendChild(tdLen);
+
+      const tdStatus = document.createElement('td');
+      tdStatus.innerHTML = (ta.value.trim()==='')? `<span class="missing">Missing</span>` : `<span class="ok">OK</span>`;
+      tr.appendChild(tdStatus);
+
+      tbody.appendChild(tr);
+
+      rowsForCSV.push({ idx, path: rec.path, baseLocale: base, base: baseText, locale, value: ta.value });
+    }
+
+    grid.hidden = false;
+    document.getElementById('counts').textContent = `${shown} rows · ${missing} missing`;
+    document.getElementById('footerCounts').textContent = `${RECORDS.length} total translatable bundles · showing ${shown} rows`;
+
+    grid.dataset.csv = JSON.stringify(rowsForCSV);
+  }
 
   function updateCounts(){
     const locale = $('#localeSelect').value;
@@ -361,6 +379,18 @@
     collectLocales(LESSON);
     RECORDS = collectTranslatables(LESSON);
     populateLocaleSelects();
+
+    // Apply ?lang= if available and present in options
+    try{
+      const urlParams = new URLSearchParams(location.search);
+      const lang = urlParams.get('lang');
+      if (lang) {
+        const sel = $('#localeSelect');
+        if ([...sel.options].some(o => o.value === lang)) sel.value = lang;
+      }
+    }catch{}
+    setUrlLangParam($('#localeSelect').value);
+
     renderTable();
   }
 
@@ -398,7 +428,10 @@
     downloadCSV('lesson_strings.csv', rows);
   });
 
-  document.getElementById('localeSelect').addEventListener('change', () => { renderTable(); updateCounts(); });
+  document.getElementById('localeSelect').addEventListener('change', () => {
+    setUrlLangParam($('#localeSelect').value);
+    renderTable(); updateCounts();
+  });
   document.getElementById('baseSelect').addEventListener('change', () => { renderTable(); updateCounts(); });
   document.getElementById('missingOnly').addEventListener('change', renderTable);
   document.getElementById('search').addEventListener('input', renderTable);
@@ -578,18 +611,6 @@
     } catch {
       ghStatus('Ready. Paste JSON or enter a PAT to load from GitHub.');
     }
-
-
-    const urlParams = new URLSearchParams(location.search);
-const lang = urlParams.get('lang');
-if (lang && $('#localeSelect')) {
-  const sel = $('#localeSelect');
-  if ([...sel.options].some(o => o.value === lang)) {
-    sel.value = lang;
-    renderTable();
-    updateCounts();
-  }
-}
   })();
 })();
 </script>
