@@ -1,205 +1,219 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Lesson JSON Translation Editor</title>
-  <style>
-    :root{ --brand:#081A35; --muted:#6b7280; --ok:#16a34a; --warn:#e11d48; --line:#e5e7eb; }
-    html,body{margin:0;padding:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Inter,Arial,sans-serif;background:#f5f7fb;color:#0f172a}
-    header{padding:16px 20px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:10}
-    header h1{font-size:18px;margin:0 0 4px 0;color:var(--brand)}
-    header .sub{color:var(--muted);font-size:13px}
-
-    .container{max-width:1200px;margin:0 auto;padding:16px}
-    .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
-    .toolbar > * {flex:0 0 auto}
-    select, input[type="text"], input[type="password"], textarea, button{
-      border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:#fff;font:inherit
-    }
-    button{cursor:pointer}
-    button.primary{background:var(--brand);color:#fff;border-color:transparent}
-    button.ghost{background:#fff}
-    label.chk{display:flex;gap:8px;align-items:center;font-size:13px;color:#334155}
-
-    details.config{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:12px}
-    details.config summary{cursor:pointer;font-weight:600}
-    textarea#jsonInput{width:100%;min-height:160px;font-family:ui-monospace,SFMono-Regular,Consolas,Monaco,monospace}
-
-    .status{font-size:12px;color:var(--muted)}
-    .pill{display:inline-block;border-radius:999px;padding:2px 8px;font-size:12px;border:1px solid var(--line);background:#fff}
-
-    table{width:100%;border-collapse:separate;border-spacing:0;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
-    thead th{position:sticky;top:64px;background:#f9fafb;border-bottom:1px solid var(--line);font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:#334155;padding:8px}
-    tbody td{border-bottom:1px solid var(--line);vertical-align:top;padding:8px}
-    tbody tr:nth-child(odd){background:#fcfdff}
-    .path{font-family:ui-monospace,Consolas,monospace;font-size:12px;white-space:nowrap;max-width:340px;overflow:hidden;text-overflow:ellipsis}
-    .base, .loc{min-width:260px}
-    textarea.edit{width:100%;min-height:60px;resize:vertical;font-family:inherit}
-    .len{color:#475569;font-size:12px}
-    .missing{color:#e11d48;font-weight:600}
-    .ok{color:#16a34a;font-weight:600}
-
-    .footer{display:flex;gap:10px;justify-content:flex-end;margin-top:12px}
-    .counter{font-size:12px;color:#334155}
-  </style>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Lesson JSON Translation Editor</title>
+<style>
+  :root{--brand:#0a1f44;--muted:#6b7280;--ok:#16a34a;--warn:#e11d48;--line:#e5e7eb}
+  html,body{margin:0;padding:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;background:#f6f8fc;color:#0f172a}
+  header{position:sticky;top:0;background:#fff;border-bottom:1px solid var(--line);padding:14px 18px;z-index:10}
+  header h1{margin:0;font-size:18px;color:var(--brand)}
+  header .sub{font-size:13px;color:var(--muted)}
+  .container{max-width:1200px;margin:0 auto;padding:16px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .toolbar{margin:12px 0}
+  select,input[type=text],input[type=password],textarea,button{
+    border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:#fff;font:inherit
+  }
+  textarea#jsonInput{width:100%;min-height:160px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+  button{cursor:pointer}
+  button.primary{background:var(--brand);border-color:transparent;color:#fff}
+  button.ghost{background:#fff}
+  label.chk{display:flex;gap:6px;align-items:center;font-size:13px;color:#334155}
+  details.box{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;margin:10px 0}
+  details.box summary{cursor:pointer;font-weight:600}
+  .status{font-size:12px;color:var(--muted)}
+  .pill{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:2px 8px;font-size:12px;background:#fff}
+  table{width:100%;border-collapse:separate;border-spacing:0;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  thead th{position:sticky;top:64px;background:#f9fafb;border-bottom:1px solid var(--line);font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:#334155;padding:8px}
+  tbody td{border-bottom:1px solid var(--line);vertical-align:top;padding:8px}
+  tbody tr:nth-child(odd){background:#fcfdff}
+  .path{font-family:ui-monospace,Consolas,monospace;font-size:12px;white-space:nowrap;max-width:360px;overflow:hidden;text-overflow:ellipsis}
+  .base,.loc{min-width:260px}
+  textarea.edit{width:100%;min-height:62px;resize:vertical}
+  .len{font-size:12px;color:#475569}
+  .missing{color:var(--warn);font-weight:600}
+  .ok{color:var(--ok);font-weight:600}
+  .right{margin-left:auto}
+</style>
 </head>
 <body>
-  <header>
-    <h1>Lesson JSON Translation Editor</h1>
-    <div class="sub">Proofread only the question fields and push changes to GitHub. Supports raw JSON or <code>var/let/const lessonData = {…};</code>.</div>
-  </header>
+<header>
+  <h1>Lesson JSON Translation Editor</h1>
+  <div class="sub">Paste your JSON or connect to GitHub. Only edits <code>questions[i].title/text/explanationText/rightAnswerText/wrongAnswerText</code>.</div>
+</header>
 
-  <div class="container">
-    <details class="config" open>
-      <summary>Load / Paste JSON</summary>
-      <div style="display:grid;gap:8px">
-        <div class="status">Tip: If this page is embedded where <code>window.lessonData</code> already exists, click “Load from window.lessonData”. Otherwise paste the file contents and click “Load JSON”. This also accepts files that begin with <code>var lessonData =</code>.</div>
-        <div class="toolbar">
-          <button id="btnLoadWindow" class="ghost">Load from <code>window.lessonData</code></button>
-          <button id="btnLoadTextarea" class="primary">Load JSON</button>
-          <button id="btnDownload" class="ghost">Export Updated JSON</button>
-          <button id="btnCSV" class="ghost">Export CSV (visible)</button>
-        </div>
-        <textarea id="jsonInput" placeholder='Paste the JSON for your lesson here (either the object itself, {"lessonData": ...}, or a JS file like "var lessonData = {...};").'></textarea>
-      </div>
-    </details>
-
-    <details class="config">
-      <summary>Connect to GitHub (load & save JSON)</summary>
-      <div style="display:grid;gap:8px">
-        <div class="status">Uses GitHub REST API. Your token is only sent to GitHub from this page and can be stored locally if you choose. For private repos use a fine‑grained token with <em>Contents: Read & Write</em>. Default path is <code>translation.json</code> at repo root.</div>
-        <div class="toolbar" style="flex-wrap:wrap;gap:8px">
-          <input id="ghOwner" placeholder="owner (e.g. my-org)" />
-          <input id="ghRepo" placeholder="repo (e.g. training-content)" />
-          <input id="ghBranch" placeholder="branch (e.g. main)" />
-          <input id="ghPath" placeholder="path (e.g. translation.json)" style="min-width:260px" value="translation.json" />
-          <input id="ghToken" placeholder="personal access token (PAT)" type="password" style="min-width:260px" />
-          <label class="chk"><input type="checkbox" id="ghRemember"/> Remember on this device</label>
-        </div>
-        <div class="toolbar">
-          <input id="ghMessage" type="text" placeholder="Commit message (e.g. fix sv_SE translations)" style="min-width:320px" />
-          <button id="btnGHLoad" class="ghost">Load from GitHub</button>
-          <button id="btnGHSave" class="primary">Save to GitHub</button>
-          <span id="ghStatus" class="status"></span>
-        </div>
-      </div>
-    </details>
-
-    <div class="toolbar">
-      <label>Locale
-        <select id="localeSelect"></select>
-      </label>
-      <label>Base (comparison)
-        <select id="baseSelect"></select>
-      </label>
-      <input id="search" type="text" placeholder="Search in path or text…" />
-      <label class="chk"><input type="checkbox" id="missingOnly"/> Show missing/empty only</label>
-      <label class="chk"><input type="checkbox" id="ensureKeys"/> Ensure keys exist for selected locale when exporting</label>
-      <span id="counts" class="counter">—</span>
-      <label class="chk"><input type="checkbox" id="preserveWrapper"/> Save with <code>var lessonData = …;</code></label>
+<div class="container">
+  <!-- Load / Paste -->
+  <details class="box" open>
+    <summary>Load / Paste JSON</summary>
+    <div class="status">You can paste plain JSON, <code>{"lessonData": {...}}</code>, or a JS file that starts with <code>var/let/const lessonData = {...};</code></div>
+    <div class="toolbar row">
+      <button id="btnLoadTextarea" class="primary">Load JSON from textarea</button>
+      <button id="btnDownload" class="ghost">Export updated JSON</button>
+      <button id="btnCSV" class="ghost">Export CSV (visible rows)</button>
+      <label class="chk"><input type="checkbox" id="exportWithWrapper"> Save with <code>var lessonData = …;</code></label>
     </div>
+    <textarea id="jsonInput" placeholder='Paste lesson JSON or a JS file that defines "lessonData" here...'></textarea>
+  </details>
 
-    <table id="grid" hidden>
-      <thead>
-        <tr>
-          <th style="width:36px">#</th>
-          <th>Path</th>
-          <th>Base</th>
-          <th>Locale</th>
-          <th style="width:120px">Len</th>
-          <th style="width:100px">Status</th>
-        </tr>
-      </thead>
-      <tbody id="tbody"></tbody>
-    </table>
-
-    <div class="footer">
-      <span class="counter" id="footerCounts">—</span>
+  <!-- GitHub -->
+  <details class="box" open>
+    <summary>Connect to GitHub (load & save)</summary>
+    <div class="row" style="gap:8px;margin:8px 0">
+      <input id="ghOwner" placeholder="owner (e.g. johanpantzare)" style="min-width:220px">
+      <input id="ghRepo"  placeholder="repo (e.g. video-course)" style="min-width:220px">
+      <input id="ghBranch" placeholder="branch (default: main)" style="min-width:160px">
+      <input id="ghPath"   placeholder="path (e.g. translation.json)" style="min-width:260px">
+      <input id="ghToken"  placeholder="token (classic PAT)" type="password" style="min-width:300px">
+      <label class="chk"><input type="checkbox" id="ghRemember"> Remember on this device</label>
     </div>
+    <div class="row toolbar">
+      <input id="ghMessage" placeholder="Commit message (default: Update lesson translations)" style="flex:1;min-width:260px">
+      <span class="right"></span>
+      <button id="btnGHLoad" class="ghost">Load from GitHub</button>
+      <button id="btnGHSave" class="primary">Save to GitHub</button>
+    </div>
+    <div class="status" id="ghStatus">—</div>
+  </details>
+
+  <!-- Controls -->
+  <div class="row toolbar">
+    <label>Locale
+      <select id="localeSelect"></select>
+    </label>
+    <label>Base (comparison)
+      <select id="baseSelect"></select>
+    </label>
+    <input id="search" type="text" placeholder="Search in path or text…" style="min-width:280px">
+    <label class="chk"><input type="checkbox" id="missingOnly"> Show missing/empty only</label>
+    <label class="chk"><input type="checkbox" id="ensureKeys"> Ensure keys exist for selected locale on export/save</label>
+    <span id="counts" class="pill">—</span>
   </div>
+
+  <!-- Grid -->
+  <table id="grid" hidden>
+    <thead>
+      <tr>
+        <th style="width:36px">#</th>
+        <th>Path</th>
+        <th>Base</th>
+        <th>Locale</th>
+        <th style="width:110px">Len</th>
+        <th style="width:100px">Status</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+  <div class="status" id="footerCounts">—</div>
+</div>
 
 <script>
 (() => {
-  // ————— Utilities —————
-  const isLocaleKey = (k) => k === 'basic' || /^[a-z]{2}_[A-Z]{2}$/.test(k);
-  const by = (k) => (a,b) => (a[k] > b[k]) ? 1 : (a[k] < b[k]) ? -1 : 0;
+  // ===== Helpers =====
+  const $ = (s, r=document) => r.querySelector(s);
+  const tbody = $('#tbody'), grid = $('#grid');
 
-  function download(filename, text){
+  const isLocaleKey = k => k === 'basic' || /^[a-z]{2}_[A-Z]{2}$/.test(k);
+  const download = (name, text, type='application/json') => {
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([text], {type:'application/json'}));
-    a.download = filename;
-    document.body.appendChild(a); a.click(); a.remove();
+    a.href = URL.createObjectURL(new Blob([text], {type}));
+    a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  };
+  const toB64 = (s) => btoa(unescape(encodeURIComponent(s)));
+  const fromB64 = (b) => decodeURIComponent(escape(atob(b)));
+
+  // ===== State =====
+  let LESSON = null;        // Parsed lesson object
+  let RECORDS = [];         // [{ path, node, baseLocale }]
+  let LOCALES = new Set();
+  const GITHUB = { owner:'', repo:'', branch:'main', path:'translation.json', token:'', sha:'' };
+  let WRAPPER = { has:false, before:'', after:'' }; // for var lessonData wrapper
+
+  // ===== Parse incoming text that may have a JS wrapper =====
+  function extractLessonFromText(text){
+    const t = text.trim();
+    // Case A: plain JSON { ... } or {"lessonData": {...}}
+    if (t.startsWith('{')) {
+      const obj = JSON.parse(t);
+      return { lesson: obj.lessonData || obj, wrapper:{has:false,before:'',after:''} };
+    }
+    // Case B: JS assignment: var/let/const lessonData = { ... };
+    const assignIdx = t.search(/\b(?:var|let|const)\s+lessonData\s*=/);
+    if (assignIdx === -1) throw new Error('Not valid JSON and no "lessonData" assignment found.');
+    const braceStart = t.indexOf('{', assignIdx);
+    if (braceStart === -1) throw new Error('Could not find opening { after lessonData =');
+    // Bracket-match to find the closing }
+    let i = braceStart, depth = 0, inStr = false, strCh = '', esc = false;
+    for (; i < t.length; i++){
+      const ch = t[i];
+      if (inStr){
+        if (esc){ esc = false; }
+        else if (ch === '\\\\'){ esc = true; }
+        else if (ch === strCh){ inStr = false; strCh = ''; }
+      } else {
+        if (ch === '"' || ch === "'"){ inStr = true; strCh = ch; }
+        else if (ch === '{'){ depth++; }
+        else if (ch === '}'){ depth--; if (depth === 0) { i++; break; } }
+      }
+    }
+    if (depth !== 0) throw new Error('Unbalanced braces in file.');
+    const jsonText = t.slice(braceStart, i);
+    const before = t.slice(0, braceStart);
+    const after  = t.slice(i).replace(/^[\\s;]*/, ''); // strip optional semicolon/newlines
+    const obj = JSON.parse(jsonText);
+    return { lesson: obj, wrapper:{has:true,before,after} };
   }
 
-  function downloadCSV(filename, rows){
-    const esc = (s) => '"' + (String(s??'').replaceAll('"','""')) + '"';
-    const header = ['#','path','baseLocale','base','locale','value'].map(esc).join(',');
-    const lines = rows.map(r => [r.idx, r.path, r.baseLocale, r.base, r.locale, r.value].map(esc).join(','));
-    const csv = [header, ...lines].join('\n');
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
-    a.download = filename;
-    document.body.appendChild(a); a.click(); a.remove();
-  }
-
-  // ————— State —————
-  let LESSON = null;             // the full JSON object (either raw or lessonData)
-  let RECORDS = [];              // flat list of translatable entries
-  let LOCALES = new Set();       // discovered locales
-  const GITHUB = { owner:'', repo:'', branch:'', path:'', token:'', sha:'' };
-  let WRAPPER = { has:false, before:'', after:'' }; // if the source had var/let/const wrapper
-
-  // ————— Discovery —————
+  // ===== Collect locales & records (only requested fields) =====
   function collectLocales(obj){
-    try{ (obj.languages||[]).forEach(x => x?.locale && LOCALES.add(x.locale)); }catch{}
-    traverse(obj, (node) => {
+    (obj.languages || []).forEach(x => x?.locale && LOCALES.add(x.locale));
+    // Also derive from objects that look like translation maps
+    const visit = (node) => {
       if (node && typeof node === 'object' && !Array.isArray(node)){
         const keys = Object.keys(node);
         if (keys.some(isLocaleKey)) keys.filter(isLocaleKey).forEach(k => LOCALES.add(k));
-      }
-    });
+        Object.values(node).forEach(visit);
+      } else if (Array.isArray(node)) node.forEach(visit);
+    };
+    visit(obj);
   }
 
-  function traverse(obj, cb, path = ''){
-    cb(obj, path);
-    if (Array.isArray(obj)){
-      obj.forEach((v,i) => traverse(v, cb, path + '[' + i + ']'));
-    } else if (obj && typeof obj === 'object'){
-      for (const [k,v] of Object.entries(obj)){
-        traverse(v, cb, path + (path?'.':'') + k);
-      }
-    }
-  }
-
-  function collectTranslatables(obj){
-    // Only parse the specified fields within questions[*]
+  function collectRecords(obj){
     const FIELDS = ['title','text','explanationText','rightAnswerText','wrongAnswerText'];
+    const questions = Array.isArray(obj.questions) ? obj.questions
+                     : (obj.lessonData && Array.isArray(obj.lessonData.questions)) ? obj.lessonData.questions
+                     : [];
     const recs = [];
-    const questions = Array.isArray(obj.questions) ? obj.questions : (obj.lessonData && Array.isArray(obj.lessonData.questions) ? obj.lessonData.questions : []);
-
     questions.forEach((q, i) => {
       FIELDS.forEach(field => {
         const node = q?.[field];
         if (node && typeof node === 'object' && !Array.isArray(node)){
           const keys = Object.keys(node);
           if (keys.some(isLocaleKey)){
-            const locales = keys.filter(isLocaleKey);
-            const baseLocale = locales.includes('en_US') ? 'en_US' : (locales.includes('basic') ? 'basic' : locales[0]);
-            recs.push({ path: `questions[${i}].${field}`, node, baseLocale });
+            const locs = keys.filter(isLocaleKey);
+            const baseLocale = locs.includes('en_US') ? 'en_US' : (locs.includes('basic') ? 'basic' : locs[0]);
+            recs.push({ path:`questions[${i}].${field}`, node, baseLocale });
           }
         }
       });
     });
-
     return recs;
   }
 
-  // ————— Rendering —————
-  const $ = (s, r = document) => r.querySelector(s);
-  const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
-  const tbody = $('#tbody');
-  const grid = $('#grid');
+  // ===== UI population =====
+  function populateLocaleSelects(){
+    const locs = Array.from(LOCALES).sort();
+    const localeSel = $('#localeSelect'), baseSel = $('#baseSelect');
+    localeSel.innerHTML = ''; baseSel.innerHTML = '';
+    for (const l of locs){
+      const a = document.createElement('option'); a.value = l; a.textContent = l; localeSel.appendChild(a);
+      const b = document.createElement('option'); b.value = l; b.textContent = l; baseSel.appendChild(b);
+    }
+    localeSel.value = locs.includes('sv_SE') ? 'sv_SE' : (locs.includes('en_US') ? 'en_US' : locs[0] || 'en_US');
+    baseSel.value   = locs.includes('en_US') ? 'en_US' : (locs.includes('basic') ? 'basic' : locs[0] || 'en_US');
+  }
 
   function renderTable(){
     const locale = $('#localeSelect').value;
@@ -208,14 +222,13 @@
     const missingOnly = $('#missingOnly').checked;
 
     tbody.innerHTML = '';
-    let idx = 0, shown = 0, missing = 0;
-    const rowsForCSV = [];
+    let shown = 0, missing = 0, idx = 0;
+    const csvRows = [];
 
     for (const rec of RECORDS){
       idx++;
       const baseText = rec.node?.[base] ?? '';
-      const locText = rec.node?.[locale] ?? '';
-
+      const locText  = rec.node?.[locale] ?? '';
       const isMissing = (locText ?? '') === '';
       if (isMissing) missing++;
 
@@ -224,228 +237,200 @@
       if (missingOnly && !isMissing) continue;
 
       shown++;
-
       const tr = document.createElement('tr');
-      const tdIdx = document.createElement('td'); tdIdx.textContent = String(idx); tr.appendChild(tdIdx);
 
+      const tdIdx = document.createElement('td'); tdIdx.textContent = String(idx); tr.appendChild(tdIdx);
       const tdPath = document.createElement('td'); tdPath.className = 'path'; tdPath.title = rec.path; tdPath.textContent = rec.path; tr.appendChild(tdPath);
 
       const tdBase = document.createElement('td'); tdBase.className = 'base';
-      const baseArea = document.createElement('div'); baseArea.textContent = baseText; tdBase.appendChild(baseArea); tr.appendChild(tdBase);
+      const baseDiv = document.createElement('div'); baseDiv.textContent = baseText; tdBase.appendChild(baseDiv);
+      tr.appendChild(tdBase);
 
       const tdLoc = document.createElement('td'); tdLoc.className = 'loc';
-      const ta = document.createElement('textarea');
-      ta.className = 'edit'; ta.value = locText ?? '';
-      ta.addEventListener('input', (e) => {
-        rec.node[locale] = e.target.value; // bind live
-        updateCounts();
-      });
+      const ta = document.createElement('textarea'); ta.className = 'edit'; ta.value = locText ?? '';
+      ta.addEventListener('input', (e) => { rec.node[locale] = e.target.value; updateCounts(); });
       tdLoc.appendChild(ta); tr.appendChild(tdLoc);
 
-      const tdLen = document.createElement('td'); tdLen.innerHTML = `<span class="len">${(ta.value||'').length}</span>`; tr.appendChild(tdLen);
-      ta.addEventListener('input', () => tdLen.innerHTML = `<span class="len">${(ta.value||'').length}</span>`);
+      const tdLen = document.createElement('td'); tdLen.innerHTML = '<span class="len">'+(ta.value||'').length+'</span>'; tr.appendChild(tdLen);
+      ta.addEventListener('input', () => tdLen.innerHTML = '<span class="len">'+(ta.value||'').length+'</span>');
 
       const tdStatus = document.createElement('td');
-      tdStatus.innerHTML = isMissing ? `<span class="missing">Missing</span>` : `<span class="ok">OK</span>`;
-      ta.addEventListener('input', () => tdStatus.innerHTML = (ta.value.trim()==='')?`<span class="missing">Missing</span>`:`<span class="ok">OK</span>`);
+      tdStatus.innerHTML = isMissing ? '<span class="missing">Missing</span>' : '<span class="ok">OK</span>';
+      ta.addEventListener('input', () => tdStatus.innerHTML = (ta.value.trim()==='')?'<span class="missing">Missing</span>':'<span class="ok">OK</span>');
       tr.appendChild(tdStatus);
 
       tbody.appendChild(tr);
-
-      rowsForCSV.push({ idx, path: rec.path, baseLocale: base, base: baseText, locale, value: ta.value });
+      csvRows.push({ idx, path:rec.path, baseLocale:base, base:baseText, locale, value:ta.value });
     }
 
     grid.hidden = false;
     $('#counts').textContent = `${shown} rows · ${missing} missing`;
-    $('#footerCounts').textContent = `${RECORDS.length} total translatable bundles · showing ${shown} rows`;
-
-    grid.dataset.csv = JSON.stringify(rowsForCSV);
-  }
-
-  function populateLocaleSelects(){
-    const locs = Array.from(LOCALES).sort();
-    const sel = $('#localeSelect');
-    const baseSel = $('#baseSelect');
-    sel.innerHTML = '';
-    baseSel.innerHTML = '';
-    for (const l of locs){
-      const o1 = document.createElement('option'); o1.value = l; o1.textContent = l; sel.appendChild(o1);
-      const o2 = document.createElement('option'); o2.value = l; o2.textContent = l; baseSel.appendChild(o2);
-    }
-    sel.value = locs.includes('sv_SE') ? 'sv_SE' : (locs.includes('en_US')?'en_US':locs[0]||'en_US');
-    baseSel.value = locs.includes('en_US') ? 'en_US' : (locs.includes('basic')?'basic':locs[0]||'en_US');
+    $('#footerCounts').textContent = `${RECORDS.length} total bundles · showing ${shown}`;
+    grid.dataset.csv = JSON.stringify(csvRows);
   }
 
   function updateCounts(){
     const locale = $('#localeSelect').value;
-    let missing = 0;
-    for (const rec of RECORDS){ if ((rec.node?.[locale]??'') === '') missing++; }
     const total = RECORDS.length;
+    let missing = 0;
+    for (const rec of RECORDS) if ((rec.node?.[locale] ?? '') === '') missing++;
     $('#counts').textContent = `${total} rows · ${missing} missing in ${locale}`;
   }
 
-  // ————— Wrapper-aware parsing (accepts JS assignment) —————
-  function normalizeRaw(raw){
-    const s = String(raw||'').trim();
-    const first = s.indexOf('{');
-    const last  = s.lastIndexOf('}');
-    if (first === -1 || last === -1 || last <= first){
-      return { jsonText: s, wrapper: { has:false, before:'', after:'' } };
-    }
-    const before = s.slice(0, first).replace(/\s+/g,' ').trim();
-    const after  = s.slice(last+1).trim();
-    const assigned = before.startsWith('var lessonData =') || before.startsWith('let lessonData =') || before.startsWith('const lessonData =');
-    const onlySemis = after.replace(/[\s;]/g,'') === '';
-    if (assigned && onlySemis){
-      return { jsonText: s.slice(first, last+1), wrapper: { has:true, before: s.slice(0, first), after: s.slice(last+1) } };
-    }
-    return { jsonText: s, wrapper: { has:false, before:'', after:'' } };
-  }
-
-  function parseAndLoad(raw){
-    const { jsonText, wrapper } = normalizeRaw(raw);
-    WRAPPER = wrapper;
-    const parsed = JSON.parse(jsonText);
-    loadFromJSONObj(parsed);
-    const cb = document.getElementById('preserveWrapper');
-    if (cb) cb.checked = WRAPPER.has;
-  }
-
-  // ————— Loaders —————
-  function loadFromJSONObj(obj){
-    LESSON = obj.lessonData || obj; // allow either wrapper or direct object
-    if (!LESSON || typeof LESSON !== 'object') throw new Error('Could not find a valid object. Paste either the lesson object or {"lessonData": ...}');
-
-    RECORDS = []; LOCALES = new Set();
-
+  // ===== Load a lesson object and build UI =====
+  function loadFromLessonObject(obj){
+    LESSON = obj.lessonData || obj;
+    if (!LESSON || typeof LESSON !== 'object') throw new Error('Could not find lesson object (expected object or {"lessonData": ...}).');
+    LOCALES = new Set(); RECORDS = [];
     collectLocales(LESSON);
-    RECORDS = collectTranslatables(LESSON);
-
+    RECORDS = collectRecords(LESSON);
+    if (!RECORDS.length) console.warn('No translatable fields found in questions[].');
     populateLocaleSelects();
     renderTable();
   }
 
-  // ————— Buttons —————
-  $('#btnLoadWindow').addEventListener('click', () => {
-    if (window.lessonData){
-      loadFromJSONObj(window.lessonData);
-    } else if (window.lessonData === undefined && window.lessonDataRaw){
-      try{ loadFromJSONObj(JSON.parse(window.lessonDataRaw)); }catch(e){ alert('window.lessonDataRaw exists but is not valid JSON'); }
-    } else {
-      alert('window.lessonData is not defined on this page. Paste JSON below and click "Load JSON".');
-    }
-  });
-
+  // ===== Button handlers: paste/load/export =====
   $('#btnLoadTextarea').addEventListener('click', () => {
-    try{
-      const raw = $('#jsonInput').value.trim();
-      if (!raw) { alert('Paste JSON first.'); return; }
-      parseAndLoad(raw);
+    const raw = $('#jsonInput').value.trim();
+    if (!raw) { alert('Paste JSON or JS first.'); return; }
+    try {
+      const {lesson, wrapper} = extractLessonFromText(raw);
+      WRAPPER = wrapper;
+      loadFromLessonObject(lesson);
     } catch (e) {
-      alert('Invalid JSON/JS: ' + e.message);
+      alert('Load failed: ' + e.message);
     }
   });
 
   $('#btnDownload').addEventListener('click', () => {
-    const ensure = $('#ensureKeys').checked;
-    const locale = $('#localeSelect').value;
-    if (ensure){
-      for (const rec of RECORDS){ if (!(locale in rec.node)) rec.node[locale] = rec.node?.en_US ?? rec.node?.basic ?? ''; }
+    if (!LESSON) { alert('Nothing to export. Load JSON first.'); return; }
+    if ($('#ensureKeys').checked){
+      const loc = $('#localeSelect').value;
+      for (const rec of RECORDS){ if (!(loc in rec.node)) rec.node[loc] = rec.node.en_US ?? rec.node.basic ?? ''; }
     }
-    const preserve = document.getElementById('preserveWrapper').checked;
-    let content = JSON.stringify(LESSON, null, 2);
-    if (preserve && WRAPPER.has){
-      // preserve exact wrapper syntax we saw
-      content = WRAPPER.before + content + WRAPPER.after;
+    const json = JSON.stringify(LESSON, null, 2);
+    if ($('#exportWithWrapper').checked || WRAPPER.has){
+      // Rebuild a friendly wrapper regardless of original before/after
+      const wrapped = 'var lessonData = ' + json + ';\n';
+      download('translation.wrapped.js', wrapped, 'text/javascript');
+    } else {
+      download('lessonData.updated.json', json);
     }
-    download('translation.updated.json', content);
   });
 
   $('#btnCSV').addEventListener('click', () => {
     const rows = JSON.parse(grid.dataset.csv || '[]');
-    if (!rows.length){ alert('Nothing to export. Load JSON first.'); return; }
-    downloadCSV('lesson_strings.csv', rows);
+    if (!rows.length){ alert('Nothing to export.'); return; }
+    const esc = s => '"' + String(s ?? '').replaceAll('"','""') + '"';
+    const header = ['#','path','baseLocale','base','locale','value'].map(esc).join(',');
+    const csv = [header, ...rows.map(r => [r.idx,r.path,r.baseLocale,r.base,r.locale,r.value].map(esc).join(','))].join('\n');
+    download('lesson_strings.csv', csv, 'text/csv');
   });
 
-  // ————— Interactions —————
+  // ===== Interactions =====
   $('#localeSelect').addEventListener('change', renderTable);
   $('#baseSelect').addEventListener('change', renderTable);
   $('#missingOnly').addEventListener('change', renderTable);
-  $('#search').addEventListener('input', () => { renderTable(); });
+  $('#search').addEventListener('input', renderTable);
 
-  // ————— GitHub integration —————
-  const ghStatus = (msg) => { document.getElementById('ghStatus').textContent = msg || ''; };
-  const b64 = (str) => { return btoa(unescape(encodeURIComponent(str))); };
-  const fromB64 = (b64str) => decodeURIComponent(escape(atob(b64str)));
+  // ===== GitHub integration =====
+  const ghStatus = (msg) => $('#ghStatus').textContent = msg || '—';
 
   function ghReadInputs(){
-    GITHUB.owner  = document.getElementById('ghOwner').value.trim();
-    GITHUB.repo   = document.getElementById('ghRepo').value.trim();
-    GITHUB.branch = document.getElementById('ghBranch').value.trim() || 'main';
-    GITHUB.path   = document.getElementById('ghPath').value.trim() || 'translation.json';
-    GITHUB.token  = document.getElementById('ghToken').value.trim();
+    GITHUB.owner = $('#ghOwner').value.trim();
+    GITHUB.repo  = $('#ghRepo').value.trim();
+    GITHUB.branch= $('#ghBranch').value.trim() || 'main';
+    GITHUB.path  = $('#ghPath').value.trim() || 'translation.json';
+    GITHUB.token = $('#ghToken').value.trim();
   }
   function ghWriteInputs(){
-    document.getElementById('ghOwner').value  = GITHUB.owner;
-    document.getElementById('ghRepo').value   = GITHUB.repo;
-    document.getElementById('ghBranch').value = GITHUB.branch || '';
-    document.getElementById('ghPath').value   = GITHUB.path || 'translation.json';
-    document.getElementById('ghToken').value  = GITHUB.token;
+    $('#ghOwner').value = GITHUB.owner;
+    $('#ghRepo').value  = GITHUB.repo;
+    $('#ghBranch').value= GITHUB.branch || '';
+    $('#ghPath').value  = GITHUB.path || 'translation.json';
+    $('#ghToken').value = GITHUB.token;
   }
   function ghLoadLocal(){
     try{
-      const saved = JSON.parse(localStorage.getItem('jsonEditor.gh')||'{}');
+      const saved = JSON.parse(localStorage.getItem('jsonEditor.gh') || '{}');
       Object.assign(GITHUB, saved);
       ghWriteInputs();
-      if (saved.token) document.getElementById('ghRemember').checked = true;
-      if (!GITHUB.path) document.getElementById('ghPath').value = 'translation.json';
+      if (saved.token) $('#ghRemember').checked = true;
     }catch{}
   }
   function ghPersistLocal(){
-    const remember = document.getElementById('ghRemember').checked;
+    const remember = $('#ghRemember').checked;
     const {owner,repo,branch,path,token} = GITHUB;
     localStorage.setItem('jsonEditor.gh', JSON.stringify({owner,repo,branch,path, token: remember?token:''}));
   }
 
   async function githubLoad(){
-    ghReadInputs(); ghPersistLocal(); ghStatus('Loading…');
+    ghReadInputs(); ghPersistLocal(); ghStatus('Loading from GitHub…');
     if (!GITHUB.owner || !GITHUB.repo || !GITHUB.path){ ghStatus('Owner, repo, and path are required.'); return; }
     const url = `https://api.github.com/repos/${encodeURIComponent(GITHUB.owner)}/${encodeURIComponent(GITHUB.repo)}/contents/${GITHUB.path}?ref=${encodeURIComponent(GITHUB.branch||'main')}`;
-    const res = await fetch(url, { headers: GITHUB.token ? { Authorization: `Bearer ${GITHUB.token}` } : {} });
+    const headers = {};
+    if (GITHUB.token) headers.Authorization = `token ${GITHUB.token}`;
+    const res = await fetch(url, { headers });
     if (!res.ok){ ghStatus(`Error ${res.status}: ${res.statusText}`); return; }
     const data = await res.json();
     if (!data.content){ ghStatus('No content in response.'); return; }
-    GITHUB.sha = data.sha;
+    GITHUB.sha = data.sha || '';
     const text = fromB64(data.content);
-    document.getElementById('jsonInput').value = text;
-    try { parseAndLoad(text); ghStatus('Loaded from GitHub.'); }
-    catch(e){ ghStatus('Fetched, but JSON parse failed: ' + e.message); }
+    $('#jsonInput').value = text;
+    try {
+      const {lesson, wrapper} = extractLessonFromText(text);
+      WRAPPER = wrapper;
+      loadFromLessonObject(lesson);
+      ghStatus('Loaded ✔');
+    } catch (e) {
+      ghStatus('Fetched, but parse failed: ' + e.message);
+    }
   }
 
   async function githubSave(){
-    ghReadInputs(); ghPersistLocal(); ghStatus('Saving…');
-    if (!LESSON){ ghStatus('Load JSON before saving.'); return; }
-    const ensure = document.getElementById('ensureKeys').checked;
-    const locale = document.getElementById('localeSelect').value;
-    if (ensure){ for (const rec of RECORDS){ if (!(locale in rec.node)) rec.node[locale] = rec.node?.en_US ?? rec.node?.basic ?? ''; } }
+    ghReadInputs(); ghPersistLocal(); ghStatus('Saving to GitHub…');
+    if (!LESSON){ ghStatus('Load JSON first.'); return; }
+    if (!GITHUB.owner || !GITHUB.repo || !GITHUB.path){ ghStatus('Owner, repo, and path are required.'); return; }
 
-    const preserve = document.getElementById('preserveWrapper').checked;
-    let content = JSON.stringify(LESSON, null, 2);
-    if (preserve && WRAPPER.has){ content = WRAPPER.before + content + WRAPPER.after; }
+    if ($('#ensureKeys').checked){
+      const loc = $('#localeSelect').value;
+      for (const rec of RECORDS){ if (!(loc in rec.node)) rec.node[loc] = rec.node.en_US ?? rec.node.basic ?? ''; }
+    }
 
-    const commitMessage = (document.getElementById('ghMessage').value || 'Update lesson translations').trim();
-    const body = { message: commitMessage, content: b64(content), branch: GITHUB.branch || 'main' };
-    if (GITHUB.sha) body.sha = GITHUB.sha; // required for updates
+    const json = JSON.stringify(LESSON, null, 2);
+    const contentText = ($('#exportWithWrapper').checked || WRAPPER.has)
+      ? ('var lessonData = ' + json + ';\n')
+      : json;
+
+    const body = {
+      message: ($('#ghMessage').value || 'Update lesson translations').trim(),
+      content: toB64(contentText),
+      branch: GITHUB.branch || 'main'
+    };
+    if (GITHUB.sha) body.sha = GITHUB.sha;
 
     const url = `https://api.github.com/repos/${encodeURIComponent(GITHUB.owner)}/${encodeURIComponent(GITHUB.repo)}/contents/${GITHUB.path}`;
-    const res = await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json', ...(GITHUB.token ? { Authorization: `Bearer ${GITHUB.token}` } : {}) }, body: JSON.stringify(body) });
-
-    if (!res.ok){ const err = await res.json().catch(()=>({message:res.statusText})); ghStatus(`Save failed (${res.status}): ${err.message || 'Unknown error'}`); return; }
-    const out = await res.json(); GITHUB.sha = out.content?.sha || GITHUB.sha; ghStatus('Saved to GitHub ✔');
+    const res = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(GITHUB.token ? {Authorization: `token ${GITHUB.token}`} : {})
+      },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok){
+      let err = '';
+      try { const j = await res.json(); err = j.message || ''; } catch {}
+      ghStatus(`Save failed (${res.status}): ${err || res.statusText}`);
+      return;
+    }
+    const out = await res.json();
+    GITHUB.sha = out?.content?.sha || GITHUB.sha;
+    ghStatus('Saved ✔');
   }
 
-  document.getElementById('btnGHLoad').addEventListener('click', () => { githubLoad().catch(e=>ghStatus('Load error: '+e.message)); });
-  document.getElementById('btnGHSave').addEventListener('click', () => { githubSave().catch(e=>ghStatus('Save error: '+e.message)); });
+  $('#btnGHLoad').addEventListener('click', () => { githubLoad().catch(e => ghStatus('Load error: '+e.message)); });
+  $('#btnGHSave').addEventListener('click', () => { githubSave().catch(e => ghStatus('Save error: '+e.message)); });
 
   ghLoadLocal();
 })();
