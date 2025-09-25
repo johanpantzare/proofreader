@@ -1321,7 +1321,7 @@ var lessonData = {
             "zh_CN": "<p>“测试”</p>",
             "iw_IL": "<p>&quot;מבחן&quot;</p>",
             "it_IT": "<p>&quot;Prova&quot;</p>",
-            "fi_FI": "<p>Testi</p>",
+            "fi_FI": "<p>ttt</p>",
             "hu_HU": "<p>&quot;Teszt&quot;</p>",
             "hi_IN": "<p>&quot;परीक्षण&quot;</p>",
             "th_TH": "<p>&quot;ทดสอบ&quot;</p>",
