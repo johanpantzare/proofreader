@@ -127,6 +127,7 @@
   let LESSON = null;             // the full JSON object
   let RECORDS = [];              // flat list of translatable entries
   let LOCALES = new Set();       // discovered locales
+  const GITHUB = { owner:'', repo:'', branch:'', path:'', token:'', sha:'' };       // discovered locales
 
   // ————— Discovery —————
   function collectLocales(obj){
@@ -331,6 +332,76 @@
 
   // ————— Demo seed (optional) —————
   // If you want this file to open with a tiny demo, you can assign window.lessonDataRaw to a JSON string externally
+}  // ————— GitHub integration —————
+  const ghStatus = (msg) => { document.getElementById('ghStatus').textContent = msg || ''; };
+  const b64 = (str) => { return btoa(unescape(encodeURIComponent(str))); };
+  const fromB64 = (b64str) => decodeURIComponent(escape(atob(b64str)));
+
+  function ghReadInputs(){
+    GITHUB.owner = document.getElementById('ghOwner').value.trim();
+    GITHUB.repo = document.getElementById('ghRepo').value.trim();
+    GITHUB.branch = document.getElementById('ghBranch').value.trim() || 'main';
+    GITHUB.path = document.getElementById('ghPath').value.trim();
+    GITHUB.token = document.getElementById('ghToken').value.trim();
+  }
+  function ghWriteInputs(){
+    document.getElementById('ghOwner').value = GITHUB.owner;
+    document.getElementById('ghRepo').value = GITHUB.repo;
+    document.getElementById('ghBranch').value = GITHUB.branch || '';
+    document.getElementById('ghPath').value = GITHUB.path;
+    document.getElementById('ghToken').value = GITHUB.token;
+  }
+  function ghLoadLocal(){
+    try{
+      const saved = JSON.parse(localStorage.getItem('jsonEditor.gh')||'{}');
+      Object.assign(GITHUB, saved);
+      ghWriteInputs();
+      if (saved.token) document.getElementById('ghRemember').checked = true;
+    }catch{}
+  }
+  function ghPersistLocal(){
+    const remember = document.getElementById('ghRemember').checked;
+    const {owner,repo,branch,path,token} = GITHUB;
+    localStorage.setItem('jsonEditor.gh', JSON.stringify({owner,repo,branch,path, token: remember?token:''}));
+  }
+
+  async function githubLoad(){
+    ghReadInputs(); ghPersistLocal(); ghStatus('Loading…');
+    if (!GITHUB.owner || !GITHUB.repo || !GITHUB.path){ ghStatus('Owner, repo, and path are required.'); return; }
+    const url = `https://api.github.com/repos/${encodeURIComponent(GITHUB.owner)}/${encodeURIComponent(GITHUB.repo)}/contents/${GITHUB.path}?ref=${encodeURIComponent(GITHUB.branch||'main')}`;
+    const res = await fetch(url, { headers: GITHUB.token ? { Authorization: `Bearer ${GITHUB.token}` } : {} });
+    if (!res.ok){ ghStatus(`Error ${res.status}: ${res.statusText}`); return; }
+    const data = await res.json();
+    if (!data.content){ ghStatus('No content in response.'); return; }
+    GITHUB.sha = data.sha;
+    const text = fromB64(data.content);
+    document.getElementById('jsonInput').value = text;
+    try { loadFromJSONObj(JSON.parse(text)); ghStatus('Loaded from GitHub.'); }
+    catch(e){ ghStatus('Fetched, but JSON parse failed: ' + e.message); }
+  }
+
+  async function githubSave(){
+    ghReadInputs(); ghPersistLocal(); ghStatus('Saving…');
+    if (!LESSON){ ghStatus('Load JSON before saving.'); return; }
+    const ensure = document.getElementById('ensureKeys').checked;
+    const locale = document.getElementById('localeSelect').value;
+    if (ensure){ for (const rec of RECORDS){ if (!(locale in rec.node)) rec.node[locale] = rec.node?.en_US ?? rec.node?.basic ?? ''; } }
+
+    const commitMessage = (document.getElementById('ghMessage').value || 'Update lesson translations').trim();
+    const body = { message: commitMessage, content: b64(JSON.stringify(LESSON, null, 2)), branch: GITHUB.branch || 'main' };
+    if (GITHUB.sha) body.sha = GITHUB.sha;
+
+    const url = `https://api.github.com/repos/${encodeURIComponent(GITHUB.owner)}/${encodeURIComponent(GITHUB.repo)}/contents/${GITHUB.path}`;
+    const res = await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json', ...(GITHUB.token ? { Authorization: `Bearer ${GITHUB.token}` } : {}) }, body: JSON.stringify(body) });
+    if (!res.ok){ const err = await res.json().catch(()=>({message:res.statusText})); ghStatus(`Save failed (${res.status}): ${err.message || 'Unknown error'}`); return; }
+    const out = await res.json(); GITHUB.sha = out.content?.sha || GITHUB.sha; ghStatus('Saved to GitHub ✔');
+  }
+
+  document.getElementById('btnGHLoad').addEventListener('click', () => { githubLoad().catch(e=>ghStatus('Load error: '+e.message)); });
+  document.getElementById('btnGHSave').addEventListener('click', () => { githubSave().catch(e=>ghStatus('Save error: '+e.message)); });
+
+  ghLoadLocal();
+
 })();
 </script>
 </body>
