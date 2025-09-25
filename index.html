@@ -1,5 +1,4 @@
 <!doctype html>
-
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -128,7 +127,8 @@
   let LESSON = null;             // the full JSON object
   let RECORDS = [];              // flat list of translatable entries
   let LOCALES = new Set();       // discovered locales
-  const GITHUB = { owner:'', repo:'', branch:'', path:'', token:'', sha:'' };       // discovered locales
+  const GITHUB = { owner:'', repo:'', branch:'', path:'', token:'', sha:'' };
+  let WRAPPER = { has:false, before:'', after:'' };       // discovered locales
 
   // ————— Discovery —————
   function collectLocales(obj){
