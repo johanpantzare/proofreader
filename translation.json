@@ -1287,7 +1287,7 @@ var lessonData = {
             "zh_CN": "<p>“校准”</p>",
             "iw_IL": "<p>&quot;כיול&quot;</p>",
             "it_IT": "<p>&quot;Esegui Calibrazione&quot;</p>",
-            "fi_FI": "<p>Kalibrointi</p>",
+            "fi_FI": "<p>perkälä</p>",
             "hu_HU": "<p>&quot;Kalibrálás&quot;</p>",
             "hi_IN": "<p>&quot;कैलिब्रेट&quot;</p>",
             "th_TH": "<p>&quot;ปรับเทียบ&quot;</p>",
