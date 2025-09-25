@@ -230,75 +230,90 @@
     baseSel.value = locs.includes('en_US') ? 'en_US' : (locs.includes('basic')?'basic':locs[0]||'en_US');
   }
 
-  function renderTable(){
-    const locale = $('#localeSelect').value;
-    const base = $('#baseSelect').value;
-    const q = $('#search').value.trim().toLowerCase();
-    const missingOnly = $('#missingOnly').checked;
+ function renderTable(){
+  const locale = $('#localeSelect').value;
+  const base = $('#baseSelect').value;
+  const q = $('#search').value.trim().toLowerCase();
+  const missingOnly = $('#missingOnly').checked;
 
-    const tbody = document.getElementById('tbody');
-    const grid = document.getElementById('grid');
-    tbody.innerHTML = '';
+  const tbody = document.getElementById('tbody');
+  const grid = document.getElementById('grid');
+  tbody.innerHTML = '';
 
-    let idx = 0, shown = 0, missing = 0;
-    const rowsForCSV = [];
+  let idx = 0, shown = 0, missing = 0;
+  const rowsForCSV = [];
 
-    for (const rec of RECORDS){
-      idx++;
-      const baseText = rec.node?.[base] ?? '';
-      const locText = rec.node?.[locale] ?? '';
+  for (const rec of RECORDS){
+    idx++;
+    const baseText = rec.node?.[base] ?? '';
+    const locText = rec.node?.[locale] ?? '';
 
-      const isMissing = (locText ?? '') === '';
-      if (isMissing) missing++;
+    const isMissing = (locText ?? '') === '';
+    if (isMissing) missing++;
 
-      const hay = (rec.path + ' ' + baseText + ' ' + locText).toLowerCase();
-      if (q && !hay.includes(q)) continue;
-      if (missingOnly && !isMissing) continue;
+    const hay = (rec.path + ' ' + baseText + ' ' + locText).toLowerCase();
+    if (q && !hay.includes(q)) continue;
+    if (missingOnly && !isMissing) continue;
 
-      shown++;
+    shown++;
 
-      const tr = document.createElement('tr');
-      const tdIdx = document.createElement('td'); tdIdx.textContent = String(idx); tr.appendChild(tdIdx);
+    const tr = document.createElement('tr');
+    const tdIdx = document.createElement('td'); tdIdx.textContent = String(idx); tr.appendChild(tdIdx);
 
-      const tdPath = document.createElement('td'); tdPath.className = 'path'; tdPath.title = rec.path; tdPath.textContent = rec.path;
-      if (rec.meta?.kind === 'answer' && rec.meta.isCorrect){
-        const pill = document.createElement('span');
-        pill.className = 'pill'; pill.textContent = 'Correct'; pill.style.marginLeft = '6px';
-        tdPath.appendChild(pill);
-      }
-      tr.appendChild(tdPath);
+    const tdPath = document.createElement('td'); tdPath.className = 'path'; tdPath.title = rec.path; tdPath.textContent = rec.path;
+    if (rec.meta?.kind === 'answer' && rec.meta.isCorrect){
+      const pill = document.createElement('span');
+      pill.className = 'pill'; pill.textContent = 'Correct'; pill.style.marginLeft = '6px';
+      tdPath.appendChild(pill);
+    }
+    tr.appendChild(tdPath);
 
-      const tdBase = document.createElement('td'); tdBase.className = 'base';
-      const baseArea = document.createElement('div'); baseArea.textContent = baseText; tdBase.appendChild(baseArea); tr.appendChild(tdBase);
+    const tdBase = document.createElement('td'); tdBase.className = 'base';
+    const baseArea = document.createElement('div'); baseArea.textContent = baseText; tdBase.appendChild(baseArea); tr.appendChild(tdBase);
 
-      const tdLoc = document.createElement('td'); tdLoc.className = 'loc';
-      const ta = document.createElement('textarea');
-      ta.className = 'edit'; ta.value = locText ?? '';
-      ta.addEventListener('input', (e) => {
-        rec.node[locale] = e.target.value; // bind live
-        updateCounts();
-        tdLen.innerHTML = `<span class="len">${e.target.value.length}</span>`;
-        tdStatus.innerHTML = (e.target.value.trim()==='')?`<span class="missing">Missing</span>`:`<span class="ok">OK</span>`;
-      });
-      tdLoc.appendChild(ta); tr.appendChild(tdLoc);
+    const tdLoc = document.createElement('td'); tdLoc.className = 'loc';
+    const ta = document.createElement('textarea');
+    ta.className = 'edit'; ta.value = locText ?? '';
 
-      const tdLen = document.createElement('td'); tdLen.innerHTML = `<span class="len">${(ta.value||'').length}</span>`; tr.appendChild(tdLen);
-
-      const tdStatus = document.createElement('td');
-      tdStatus.innerHTML = (ta.value.trim()==='')? `<span class="missing">Missing</span>` : `<span class="ok">OK</span>`;
-      tr.appendChild(tdStatus);
-
-      tbody.appendChild(tr);
-
-      rowsForCSV.push({ idx, path: rec.path, baseLocale: base, base: baseText, locale, value: ta.value });
+    // --- Collapse by default for certain fields ---
+    const collapseByDefault = /\.(explanationText|rightAnswerText|wrongAnswerText)$/.test(rec.path);
+    if (collapseByDefault){
+      ta.style.height = '22px';
+      ta.style.overflow = 'hidden';
+      ta.style.resize = 'none';
+      ta.addEventListener('focus', () => {
+        ta.style.height = '60px';
+        ta.style.overflow = 'auto';
+        ta.style.resize = 'vertical';
+      }, {once:true});
     }
 
-    grid.hidden = false;
-    document.getElementById('counts').textContent = `${shown} rows · ${missing} missing`;
-    document.getElementById('footerCounts').textContent = `${RECORDS.length} total translatable bundles · showing ${shown} rows`;
+    ta.addEventListener('input', (e) => {
+      rec.node[locale] = e.target.value; // bind live
+      updateCounts();
+      tdLen.innerHTML = `<span class="len">${e.target.value.length}</span>`;
+      tdStatus.innerHTML = (e.target.value.trim()==='')?`<span class="missing">Missing</span>`:`<span class="ok">OK</span>`;
+    });
+    tdLoc.appendChild(ta); tr.appendChild(tdLoc);
 
-    grid.dataset.csv = JSON.stringify(rowsForCSV);
+    const tdLen = document.createElement('td'); tdLen.innerHTML = `<span class="len">${(ta.value||'').length}</span>`; tr.appendChild(tdLen);
+
+    const tdStatus = document.createElement('td');
+    tdStatus.innerHTML = (ta.value.trim()==='')? `<span class="missing">Missing</span>` : `<span class="ok">OK</span>`;
+    tr.appendChild(tdStatus);
+
+    tbody.appendChild(tr);
+
+    rowsForCSV.push({ idx, path: rec.path, baseLocale: base, base: baseText, locale, value: ta.value });
   }
+
+  grid.hidden = false;
+  document.getElementById('counts').textContent = `${shown} rows · ${missing} missing`;
+  document.getElementById('footerCounts').textContent = `${RECORDS.length} total translatable bundles · showing ${shown} rows`;
+
+  grid.dataset.csv = JSON.stringify(rowsForCSV);
+}
+
 
   function updateCounts(){
     const locale = $('#localeSelect').value;
@@ -563,6 +578,18 @@
     } catch {
       ghStatus('Ready. Paste JSON or enter a PAT to load from GitHub.');
     }
+
+
+    const urlParams = new URLSearchParams(location.search);
+const lang = urlParams.get('lang');
+if (lang && $('#localeSelect')) {
+  const sel = $('#localeSelect');
+  if ([...sel.options].some(o => o.value === lang)) {
+    sel.value = lang;
+    renderTable();
+    updateCounts();
+  }
+}
   })();
 })();
 </script>
