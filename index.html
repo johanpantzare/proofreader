@@ -156,24 +156,52 @@
     });
   }
 
-  function collectTranslatables(obj){
-    const FIELDS = ['title','text','explanationText','rightAnswerText','wrongAnswerText'];
-    const recs = [];
-    const questions = Array.isArray(obj.questions) ? obj.questions : (obj.lessonData && Array.isArray(obj.lessonData.questions) ? obj.lessonData.questions : []);
+ function collectTranslatables(obj){
+  const FIELDS = ['title','text','explanationText','rightAnswerText','wrongAnswerText'];
+  const recs = [];
 
-    questions.forEach((q, i) => {
-      FIELDS.forEach(field => {
-        const node = q?.[field];
-        if (node && typeof node === 'object' && !Array.isArray(node)){
-          const keys = Object.keys(node);
-          if (keys.some(isLocaleKey)){
-            const locales = keys.filter(isLocaleKey);
-            const baseLocale = locales.includes('en_US') ? 'en_US' : (locales.includes('basic') ? 'basic' : locales[0]);
-            recs.push({ path: `questions[${i}].${field}`, node, baseLocale });
-          }
+  const questions = Array.isArray(obj.questions)
+    ? obj.questions
+    : (obj.lessonData && Array.isArray(obj.lessonData.questions) ? obj.lessonData.questions : []);
+
+  questions.forEach((q, i) => {
+    // 1) Question-level fields
+    FIELDS.forEach(field => {
+      const node = q?.[field];
+      if (node && typeof node === 'object' && !Array.isArray(node)){
+        const keys = Object.keys(node);
+        if (keys.some(isLocaleKey)){
+          const locales = keys.filter(isLocaleKey);
+          const baseLocale = locales.includes('en_US') ? 'en_US'
+                            : (locales.includes('basic') ? 'basic' : locales[0]);
+          recs.push({ path: `questions[${i}].${field}`, node, baseLocale });
         }
-      });
+      }
     });
+
+    // 2) Answer choices: answers[j].body
+    const answers = Array.isArray(q.answers) ? q.answers : [];
+    answers.forEach((ans, j) => {
+      const node = ans?.body;
+      if (node && typeof node === 'object' && !Array.isArray(node)){
+        const keys = Object.keys(node);
+        if (keys.some(isLocaleKey)){
+          const locales = keys.filter(isLocaleKey);
+          const baseLocale = locales.includes('en_US') ? 'en_US'
+                            : (locales.includes('basic') ? 'basic' : locales[0]);
+          recs.push({
+            path: `questions[${i}].answers[${j}].body`,
+            node,
+            baseLocale
+          });
+        }
+      }
+    });
+  });
+
+  return recs;
+}
+
 
     return recs;
   }
