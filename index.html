@@ -3,14 +3,15 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Lesson JSON Translation Editor — v1.9.0</title>
+  <title>Lesson JSON Translation Editor — v1.10.0</title>
   <style>
     :root{
       --brand:#081A35; --muted:#6b7280; --ok:#16a34a; --warn:#e11d48; --line:#e5e7eb; --bg:#f5f7fb;
-      --qhdr-bg:#eef3ff; --qhdr-fg:#0b2269; --qhdr-accent:#3b82f6;
+      --qhdr-bg:#eef3ff; --qhdr-fg:#0b2269; --qhdr-accent:#1f6feb;
+      --card-bg:#fff;
     }
     html,body{margin:0;padding:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Inter,Arial,sans-serif;background:var(--bg);color:#0f172a}
-    header{padding:16px 20px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:10}
+    header{padding:16px 20px;background:var(--card-bg);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:10}
     header h1{font-size:18px;margin:0 0 4px 0;color:var(--brand);display:flex;gap:10px;align-items:center}
     header .ver{font-size:11px;color:#fff;background:#0f172a;border-radius:999px;padding:2px 8px}
     header .sub{color:var(--muted);font-size:13px;display:flex;gap:12px;flex-wrap:wrap}
@@ -32,41 +33,28 @@
     .status{font-size:12px;color:var(--muted)}
     .pill{display:inline-block;border-radius:999px;padding:2px 8px;font-size:12px;border:1px solid var(--line);background:#fff}
 
-    table{width:100%;border-collapse:separate;border-spacing:0;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
-    thead th{position:sticky;top:64px;background:#f9fafb;border-bottom:1px solid var(--line);font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:#334155;padding:8px}
-    tbody td{border-bottom:1px solid var(--line);vertical-align:top;padding:8px}
-    tbody tr:nth-child(odd){background:#fcfdff}
-    .item{font-size:13px}
-    .base, .loc{min-width:260px}
-    textarea.edit{width:100%;min-height:60px;resize:vertical;font-family:inherit}
-    .len{color:#475569;font-size:12px;text-align:right}
-
-    /* Question header row (qhdr) — bigger + nicer color + chevron */
+    /* Question section (header + rows card) */
+    .qsection{margin:16px 0;border:1px solid var(--line);border-radius:12px;background:var(--card-bg);overflow:hidden}
     .qhdr{
-      background:var(--qhdr-bg);
-      color:var(--qhdr-fg);
-      border-left:4px solid var(--qhdr-accent);
-      padding:10px 12px;
-      margin:6px 0;
-      border-radius:8px;
-      font-size:15px;
-      font-weight:700;
-      display:flex;
-      align-items:center;
-      gap:10px;
-      cursor:pointer;
-      user-select:none;
+      display:flex;align-items:center;gap:10px;
+      background:var(--qhdr-bg); color:var(--qhdr-fg);
+      padding:12px 14px; font-size:16px; font-weight:800;
+      cursor:pointer; user-select:none;
+      border-bottom:1px solid var(--line);
     }
-    .qhdr .chev{
-      display:inline-block; width:10px; transform:rotate(0deg);
-      transition:transform .15s ease;
-      color:var(--qhdr-accent); font-weight:800;
-    }
-    .qhdr.collapsed .chev{ transform:rotate(-90deg); }
-    .qhdr .meta{
-      font-weight:600; opacity:.85; font-size:13px; color:#334155;
-      margin-left:auto;
-    }
+    .qhdr .chev{display:inline-flex;align-items:center;justify-content:center}
+    .qhdr .chev svg{width:22px;height:22px;stroke:var(--qhdr-accent);stroke-width:2.5}
+    .qhdr .title{margin-right:auto}
+    .qhdr .meta{font-weight:600;opacity:.85;font-size:13px;color:#334155}
+    .qrows{width:100%}
+    .row{display:grid;grid-template-columns:44px minmax(220px, 1fr) 1.5fr 1.5fr 80px;gap:0;border-bottom:1px solid var(--line)}
+    .row > div{padding:8px}
+    .row:nth-child(odd){background:#fcfdff}
+    .idx{color:#475569}
+    .item{font-size:13px}
+    .base, .loc{min-width:200px}
+    textarea.edit{width:100%;min-height:60px;resize:vertical;font-family:inherit}
+    .len{color:#475569;font-size:12px;text-align:right;display:flex;align-items:center;justify-content:flex-end;padding-right:12px}
 
     .footer{display:flex;gap:10px;justify-content:space-between;margin-top:12px;align-items:center}
     .counter{font-size:12px;color:#334155}
@@ -76,7 +64,7 @@
   <header>
     <h1>
       Lesson JSON Translation Editor
-      <span class="ver">v1.9.0</span>
+      <span class="ver">v1.10.0</span>
     </h1>
     <div class="sub">
       <span>Deep-link with <code>?lang=sv_SE</code> • <code>?showMeta=1</code> shows explanation/right/wrong</span>
@@ -125,18 +113,8 @@
       <span id="counts" class="counter">—</span>
     </div>
 
-    <table id="grid" hidden>
-      <thead>
-        <tr>
-          <th style="width:36px">#</th>
-          <th>Item</th>
-          <th>Base</th>
-          <th>Locale</th>
-          <th style="width:120px;text-align:right">Len</th>
-        </tr>
-      </thead>
-      <tbody id="tbody"></tbody>
-    </table>
+    <!-- Question sections will be injected here -->
+    <div id="sections"></div>
 
     <div class="footer">
       <span class="counter" id="footerCounts">—</span>
@@ -146,10 +124,7 @@
 
 <script>
 (() => {
-  // ---------- Config / Version ----------
-  const VERSION = 'v1.9.0';
-
-  // ---------- DOM / utils ----------
+  const VERSION = 'v1.10.0';
   const $ = (s, r = document) => r.querySelector(s);
   const isLocaleKey = (k) => k === 'basic' || /^[a-z]{2}_[A-Z]{2}$/.test(k);
   const storage = {
@@ -170,12 +145,12 @@
     return new TextDecoder().decode(bytes);
   }
 
-  // GitHub target
+  // GitHub target (hidden)
   const GITHUB = { owner:'johanpantzare', repo:'video-course', branch:'master', path:'translation.json', token:'', sha:'' };
 
   let LESSON = null, RECORDS = [], LOCALES = new Set(), WRAPPER = { has:false, before:'', after:'' };
-  let QINFO = []; // per-question meta: {id, type, answersCount}
-  let collapsed = new Set(storage.get('collapsedQs', [])); // remember collapsed questions
+  let QINFO = [];
+  let collapsed = new Set(storage.get('collapsedQs', []));
 
   function download(filename, text, type='application/json'){
     const a = document.createElement('a');
@@ -225,7 +200,6 @@
     return f || rec.path;
   }
 
-  // Build rows: questions.* + answers[].body (store question index & answer position)
   function collectTranslatables(obj){
     const FIELDS = ['title','text','explanationText','rightAnswerText','wrongAnswerText'];
     const recs = [];
@@ -294,9 +268,9 @@
     const missingOnly = $('#missingOnly').checked;
     const hideMeta = $('#hideMeta').checked;
 
-    const tbody = document.getElementById('tbody');
-    const grid = document.getElementById('grid');
-    tbody.innerHTML = '';
+    const host = $('#sections');
+    host.innerHTML = '';
+    const frag = document.createDocumentFragment();
 
     // Group records by question index
     const byQ = new Map();
@@ -304,7 +278,7 @@
       if (hideMeta && /\.(explanationText|rightAnswerText|wrongAnswerText)$/.test(rec.path)) continue;
       (byQ.get(rec.qIndex) || byQ.set(rec.qIndex, []).get(rec.qIndex)).push(rec);
     }
-    // Sort items inside each question
+
     const orderKey = (rec) => {
       if (rec.meta?.kind === 'answer') return 200 + (rec.meta.position ?? 0);
       const f = rec.meta?.field;
@@ -325,7 +299,7 @@
     for (let qi = 0; qi < totalQuestions; qi++){
       const recs = byQ.get(qi) || [];
 
-      // Check if any row in this question passes the search/missing filter
+      // Check visibility by filters
       let hasVisibleRow = false;
       for (const rec of recs){
         const baseText = rec.node?.[base] ?? '';
@@ -340,34 +314,42 @@
 
       visibleQuestions.add(qi);
 
-      // -------- Question header row
+      // === Section wrapper
+      const section = document.createElement('div');
+      section.className = 'qsection';
+      section.dataset.qindex = String(qi);
+
+      // === Header outside rows (full width)
       const qmeta = QINFO[qi] || {};
       const isCollapsed = collapsed.has(qi);
-      const qRow = document.createElement('tr');
-      const qCell = document.createElement('td');
-      qCell.colSpan = 5;
-      qCell.className = 'qhdr' + (isCollapsed ? ' collapsed' : '');
-      qCell.setAttribute('role','button');
-      qCell.setAttribute('tabindex','0');
-      qCell.dataset.qindex = String(qi);
-      qCell.innerHTML = `
-        <span class="chev">▸</span>
-        <span>Question ${qi+1} of ${totalQuestions}</span>
+      const qhdr = document.createElement('div');
+      qhdr.className = 'qhdr';
+      qhdr.setAttribute('role','button');
+      qhdr.setAttribute('tabindex','0');
+      qhdr.innerHTML = `
+        <span class="chev" aria-hidden="true">
+          ${isCollapsed
+            ? '<svg viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6"/></svg>'  /* chevron-down */
+            : '<svg viewBox="0 0 24 24" fill="none"><path d="M6 15l6-6 6 6"/></svg>' /* chevron-up */
+          }
+        </span>
+        <span class="title">Question ${qi+1} of ${totalQuestions}</span>
         <span class="meta">ID ${qmeta.id ?? ''} • ${qmeta.type || ''} • ${qmeta.answersCount||0} answers</span>
       `;
-      // Toggle behavior
       const toggle = () => {
         if (collapsed.has(qi)) collapsed.delete(qi); else collapsed.add(qi);
         storage.set('collapsedQs', Array.from(collapsed));
-        renderTable(); // re-render to apply visibility + chevron
+        renderTable();
       };
-      qCell.addEventListener('click', toggle);
-      qCell.addEventListener('keydown', (e)=>{ if (e.key==='Enter' || e.key===' ') { e.preventDefault(); toggle(); }});
-      qRow.appendChild(qCell);
-      tbody.appendChild(qRow);
+      qhdr.addEventListener('click', toggle);
+      qhdr.addEventListener('keydown', (e)=>{ if (e.key==='Enter' || e.key===' ') { e.preventDefault(); toggle(); }});
+      section.appendChild(qhdr);
 
-      // -------- Item rows (hidden if collapsed)
+      // === Rows (hidden if collapsed)
       if (!isCollapsed){
+        const rows = document.createElement('div');
+        rows.className = 'qrows';
+
         for (const rec of recs){
           const baseText = rec.node?.[base] ?? '';
           const locText = rec.node?.[locale] ?? '';
@@ -380,27 +362,24 @@
 
           shown++; idx++;
 
-          const tr = document.createElement('tr');
+          const row = document.createElement('div');
+          row.className = 'row';
 
-          const tdIdx = document.createElement('td'); tdIdx.textContent = String(idx); tr.appendChild(tdIdx);
-
-          const tdItem = document.createElement('td'); tdItem.className = 'item';
+          const cIdx = document.createElement('div'); cIdx.className='idx'; cIdx.textContent = String(idx);
+          const cItem = document.createElement('div'); cItem.className='item';
           const label = document.createElement('span'); label.textContent = labelFor(rec);
-          tdItem.appendChild(label);
+          cItem.appendChild(label);
           if (rec.meta?.kind === 'answer' && rec.meta.isCorrect){
             const pill = document.createElement('span');
             pill.className = 'pill'; pill.textContent = 'Correct'; pill.style.marginLeft = '6px';
-            tdItem.appendChild(pill);
+            cItem.appendChild(pill);
           }
-          tr.appendChild(tdItem);
 
-          const tdBase = document.createElement('td'); tdBase.className = 'base';
-          const baseArea = document.createElement('div'); baseArea.textContent = baseText; tdBase.appendChild(baseArea); tr.appendChild(tdBase);
+          const cBase = document.createElement('div'); cBase.className='base'; cBase.textContent = baseText;
 
-          const tdLoc = document.createElement('td'); tdLoc.className = 'loc';
+          const cLoc = document.createElement('div'); cLoc.className='loc';
           const ta = document.createElement('textarea');
           ta.className = 'edit'; ta.value = locText ?? '';
-          // Collapse small height for meta fields if user chooses to show them
           const collapseByDefault = /\.(explanationText|rightAnswerText|wrongAnswerText)$/.test(rec.path);
           if (collapseByDefault){
             ta.style.height = '22px';
@@ -413,31 +392,33 @@
             }, {once:true});
           }
           ta.addEventListener('input', (e) => {
-            rec.node[locale] = e.target.value; // bind live
+            rec.node[locale] = e.target.value;
             updateCounts();
-            tdLen.textContent = String(e.target.value.length);
+            cLen.textContent = String(e.target.value.length);
           });
-          tdLoc.appendChild(ta); tr.appendChild(tdLoc);
+          cLoc.appendChild(ta);
 
-          const tdLen = document.createElement('td'); tdLen.className = 'len'; tdLen.textContent = String((ta.value||'').length); tr.appendChild(tdLen);
+          const cLen = document.createElement('div'); cLen.className='len'; cLen.textContent = String((ta.value||'').length);
 
-          tbody.appendChild(tr);
+          row.append(cIdx, cItem, cBase, cLoc, cLen);
+          rows.appendChild(row);
 
           rowsForCSV.push({ idx, qnum: qi+1, item: labelFor(rec), path: rec.path, baseLocale: base, base: baseText, locale, value: ta.value });
         }
+        section.appendChild(rows);
       }
+
+      frag.appendChild(section);
     }
 
-    grid.hidden = false;
+    host.appendChild(frag);
+
     $('#counts').textContent = `${shown} items · ${missing} missing in ${$('#localeSelect').value}`;
     $('#footerCounts').textContent = `${RECORDS.length} total translatable items`;
-    $('#visibleQ').textContent = `${Array.from(new Set([...collapsed].filter(x=>x<QINFO.length ? false : false))).length} / ${QINFO.length} questions collapsed`;
-    // The above visibleQ line purposely counts only collapsed if within range
     const collapsedCount = Array.from(collapsed).filter(x => x >=0 && x < QINFO.length).length;
     $('#visibleQ').textContent = `${QINFO.length - collapsedCount} visible / ${QINFO.length} total questions`;
 
-    // store CSV rows on the table
-    document.getElementById('grid').dataset.csv = JSON.stringify(rowsForCSV);
+    host.dataset.csv = JSON.stringify(rowsForCSV);
   }
 
   function updateCounts(){
@@ -491,11 +472,9 @@
     RECORDS = collectTranslatables(LESSON);
     populateLocaleSelects();
 
-    // Show total questions prominently
     const totalQ = Array.isArray(LESSON.questions) ? LESSON.questions.length : 0;
     $('#qTotal').textContent = `${totalQ} questions detected`;
 
-    // Apply ?lang=
     try{
       const urlParams = new URLSearchParams(location.search);
       const lang = urlParams.get('lang');
@@ -504,16 +483,14 @@
         const sel = $('#localeSelect');
         if ([...sel.options].some(o => o.value === lang)) sel.value = lang;
       }
-      // default: hide meta; but if ?showMeta=1 present, uncheck
-      const hideMetaBox = $('#hideMeta');
-      hideMetaBox.checked = !(showMeta === '1' || showMeta === 'true');
+      $('#hideMeta').checked = !(showMeta === '1' || showMeta === 'true');
     }catch{}
     setUrlLangParam($('#localeSelect').value);
 
     renderTable();
   }
 
-  // ---------- UI buttons ----------
+  // Buttons
   $('#btnLoadTextarea').addEventListener('click', () => {
     try{
       const raw = $('#jsonInput').value.trim();
@@ -525,7 +502,6 @@
       alert('Invalid input: ' + e.message);
     }
   });
-
   $('#btnDownload').addEventListener('click', () => {
     const ensure = $('#ensureKeys').checked;
     const locale = $('#localeSelect').value;
@@ -539,10 +515,8 @@
       download('lessonData.updated.json', json);
     }
   });
-
   $('#btnCSV').addEventListener('click', () => {
-    const grid = $('#grid');
-    const rows = JSON.parse(grid.dataset.csv || '[]');
+    const rows = JSON.parse($('#sections').dataset.csv || '[]');
     if (!rows.length){ alert('Nothing to export. Load JSON first.'); return; }
     downloadCSV('lesson_strings.csv', rows);
   });
@@ -556,18 +530,16 @@
   $('#search').addEventListener('input', renderTable);
   $('#hideMeta').addEventListener('change', () => { renderTable(); updateCounts(); });
 
-  // Expand/Collapse all
   $('#btnExpandAll').addEventListener('click', () => {
     collapsed.clear(); storage.set('collapsedQs', Array.from(collapsed)); renderTable();
   });
   $('#btnCollapseAll').addEventListener('click', () => {
-    // collapse all existing questions
     const count = QINFO.length;
     collapsed = new Set(Array.from({length:count}, (_,i)=>i));
     storage.set('collapsedQs', Array.from(collapsed)); renderTable();
   });
 
-  // ---------- GitHub integration ----------
+  // GitHub integration
   const ghStatus = (msg) => { $('#ghStatus').textContent = msg || ''; };
   function ghReadToken(){
     GITHUB.token = $('#ghToken').value.trim();
@@ -670,22 +642,18 @@
 
   // Init auto-load
   (function initAutoLoad(){
-    // default hide meta unless ?showMeta=1
     try{
       const p = new URLSearchParams(location.search);
       const showMeta = p.get('showMeta');
       $('#hideMeta').checked = !(showMeta === '1' || showMeta === 'true');
     }catch{}
 
-    // globals
     if (typeof window.LESSON !== 'undefined') { try { loadFromJSONObj(window.LESSON); ghStatus('Loaded from global LESSON ✔'); return; } catch {} }
     if (typeof window.lessonData !== 'undefined') { try { loadFromJSONObj(window.lessonData); ghStatus('Loaded from global lessonData ✔'); return; } catch {} }
 
-    // textarea
     const raw = $('#jsonInput').value.trim();
     if (raw) { try { const {lesson, wrapper} = extractLessonFromText(raw); WRAPPER = wrapper; loadFromJSONObj(lesson); ghStatus('Loaded from textarea ✔'); return; } catch {} }
 
-    // GitHub via saved token
     try {
       const saved = localStorage.getItem('ghToken') || '';
       if (saved) { tokenInput.value = saved; GITHUB.token = saved; githubLoad().catch(e=>ghStatus('Load error: '+e.message)); }
