@@ -157,16 +157,26 @@
   }
 
   function collectTranslatables(obj){
+    // Only parse the specified fields within questions[*]
+    // questions[i].{title,text,explanationText,rightAnswerText,wrongAnswerText}
+    const FIELDS = ['title','text','explanationText','rightAnswerText','wrongAnswerText'];
     const recs = [];
-    traverse(obj, (node, path) => {
-      if (!node || typeof node !== 'object' || Array.isArray(node)) return;
-      const keys = Object.keys(node);
-      if (!keys.some(isLocaleKey)) return;
-      // It's a translatable bundle
-      const locales = keys.filter(isLocaleKey);
-      const baseLocale = locales.includes('en_US') ? 'en_US' : (locales.includes('basic') ? 'basic' : locales[0]);
-      recs.push({ path, node, baseLocale });
+    const questions = Array.isArray(obj.questions) ? obj.questions : (obj.lessonData && Array.isArray(obj.lessonData.questions) ? obj.lessonData.questions : []);
+
+    questions.forEach((q, i) => {
+      FIELDS.forEach(field => {
+        const node = q?.[field];
+        if (node && typeof node === 'object' && !Array.isArray(node)){
+          const keys = Object.keys(node);
+          if (keys.some(isLocaleKey)){
+            const locales = keys.filter(isLocaleKey);
+            const baseLocale = locales.includes('en_US') ? 'en_US' : (locales.includes('basic') ? 'basic' : locales[0]);
+            recs.push({ path: `questions[${i}].${field}`, node, baseLocale });
+          }
+        }
+      });
     });
+
     return recs;
   }
 
