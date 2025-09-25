@@ -1149,7 +1149,7 @@ var lessonData = {
         "ar_SA": "<p>في تيك تول، تحت أي تبويب يمكنك تغيير معلمة البرنامج؟        (Tech Tool) (Software parameter)</p>",
         "pt_BR": "<p>No Tech Tool, em qual guia você pode alterar um parâmetro de software?</p>",
         "tr_TR": "<p>Tech Tool'da bir yazılım parametresini hangi sekme altında değiştirebilirsiniz?</p>",
-        "nl_NL": "<p>Onder welk tabblad kunt u in Tech Tool een softwareparameter wijzigen?</p>",
+        "nl_NL": "<p>bajswelk tabblad kunt u in Tech Tool een softwareparameter wijzigen?</p>",
         "basic": "<p>In Tech Tool, under which tab can you change a software parameter?</p>",
         "ja_JP": "<p>Tech Toolでは、どのタブでソフトウェアパラメータを変更できますか?</p>",
         "pl_PL": "<p>W której zakładce Tech Tool można zmienić parametr oprogramowania?</p>",
