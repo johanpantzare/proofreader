@@ -1291,7 +1291,7 @@ var lessonData = {
             "hu_HU": "<p>&quot;Kalibrálás&quot;</p>",
             "hi_IN": "<p>&quot;कैलिब्रेट&quot;</p>",
             "th_TH": "<p>&quot;ปรับเทียบ&quot;</p>",
-            "sv_SE": "<p>&quot;Kalibrera&quot;</p>",
+            "sv_SE": "<p>&quot;BAJS&quot;</p>",
             "en_US": "<p>&quot;Calibrate&quot;</p>",
             "in_ID": "<p>&quot;Kalibrasi&quot;</p>",
             "cs_CZ": "<p>&quot;Kalibrovat&quot;</p>",
@@ -3872,4 +3872,4 @@ var lessonData = {
   ],
   "plainTexts": [],
   "categories": []
-}
+};
