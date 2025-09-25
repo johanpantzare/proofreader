@@ -1140,7 +1140,7 @@ var lessonData = {
         "hu_HU": "<p>A Tech Toolban melyik fül alatt lehet szoftverparamétereket módosítani?</p>",
         "hi_IN": "<p>टेक टूल में, आप किस टैब के तहत सॉफ्टवेयर पैरामीटर बदल सकते हैं?</p>",
         "th_TH": "<p>ใน Tech Tool คุณสามารถเปลี่ยนพารามิเตอร์ซอฟต์แวร์ได้ภายใต้แท็บใด</p>",
-        "sv_SE": "<p>bajsvilken flik kan du ändra en programvaruparameter i Tech Tool?</p>",
+        "sv_SE": "<p>bajsvilken bajskan du ändra en programvaruparameter i Tech Tool?</p>",
         "en_US": "<p>In Tech Tool, under which tab can you change a software parameter?</p>",
         "in_ID": "<p>Di Tech Tool, di tab mana anda dapate mengubah software parameter?</p>",
         "cs_CZ": "<p>Na které kartě v Tech Tool můžete změnit parametr softwaru?</p>",
