@@ -31,7 +31,7 @@
     thead th{position:sticky;top:64px;background:#f9fafb;border-bottom:1px solid var(--line);font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:#334155;padding:8px}
     tbody td{border-bottom:1px solid var(--line);vertical-align:top;padding:8px}
     tbody tr:nth-child(odd){background:#fcfdff}
-    .path{font-family:ui-monospace,Consolas,monospace;font-size:12px;white-space:nowrap;max-width:340px;overflow:hidden;text-overflow:ellipsis}
+    .path{font-family:ui-monospace,Consolas,monospace;font-size:12px;white-space:nowrap;max-width:420px;overflow:hidden;text-overflow:ellipsis}
     .base, .loc{min-width:260px}
     textarea.edit{width:100%;min-height:60px;resize:vertical;font-family:inherit}
     .len{color:#475569;font-size:12px}
@@ -45,26 +45,26 @@
 <body>
   <header>
     <h1>Lesson JSON Translation Editor</h1>
-    <div class="sub">Edits only: <code>questions[i].title</code>, <code>text</code>, <code>explanationText</code>, <code>rightAnswerText</code>, <code>wrongAnswerText</code>. Also parses files that begin with <code>var/let/const lessonData = …</code>.</div>
+    <div class="sub">Now includes <code>answers[j].body</code>. Also parses files that start with <code>var/let/const lessonData = …</code>.</div>
   </header>
 
   <div class="container">
     <details class="box" open>
       <summary>Load / Paste JSON</summary>
-      <div class="status">Paste plain JSON, <code>{"lessonData": {...}}</code>, or a JS file with <code>var lessonData = {...};</code></div>
+      <div class="status">Auto-load tries: global <code>LESSON</code>/<code>lessonData</code> → textarea → GitHub (if token saved). You can also paste JSON anywhere on the page.</div>
       <div class="toolbar">
-        <button id="btnLoadTextarea" class="primary">Load JSON from textarea</button>
+        <button id="btnLoadTextarea" class="ghost">Load JSON from textarea</button>
         <button id="btnDownload" class="ghost">Export Updated JSON</button>
-        <button id="btnCSV" class="ghost">Export CSV (visible)</button>
+        <button id="btnCSV" class="ghost">Export CSV (visible rows)</button>
       </div>
       <textarea id="jsonInput" placeholder='Paste the JSON for your lesson here (either the object itself, {"lessonData": ...}, or a JS file that assigns to lessonData).'></textarea>
     </details>
 
     <details class="box" open>
       <summary>GitHub</summary>
-      <div class="status">Repo details are preconfigured. Enter your <strong>Personal Access Token (classic)</strong> to read/write.</div>
+      <div class="status">Repo details are preconfigured. Enter your <strong>Personal Access Token</strong> (fine-grained or classic). Auto-save token to localStorage for next visit.</div>
       <div class="toolbar">
-        <input id="ghToken" type="password" placeholder="Personal Access Token (classic)" style="min-width:320px" />
+        <input id="ghToken" type="password" placeholder="Personal Access Token" style="min-width:320px" />
         <button id="btnGHLoad" class="ghost">Load from GitHub</button>
         <button id="btnGHSave" class="primary">Save to GitHub</button>
       </div>
@@ -105,10 +105,22 @@
 
 <script>
 (() => {
+  // ---------- DOM / utils ----------
   const $ = (s, r = document) => r.querySelector(s);
   const isLocaleKey = (k) => k === 'basic' || /^[a-z]{2}_[A-Z]{2}$/.test(k);
-  const toB64 = (s) => btoa(unescape(encodeURIComponent(s)));
-  const fromB64 = (b) => decodeURIComponent(escape(atob(b)));
+
+  // UTF-8 safe Base64 helpers
+  function toB64Utf8(str){
+    const bytes = new TextEncoder().encode(str);
+    let bin = ''; for (let i=0;i<bytes.length;i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin);
+  }
+  function fromB64Utf8(b64){
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+    return new TextDecoder().decode(bytes);
+  }
 
   // Fixed GitHub details (hidden in UI)
   const GITHUB = { owner:'johanpantzare', repo:'video-course', branch:'master', path:'translation.json', token:'', sha:'' };
@@ -156,52 +168,50 @@
     });
   }
 
- function collectTranslatables(obj){
-  const FIELDS = ['title','text','explanationText','rightAnswerText','wrongAnswerText'];
-  const recs = [];
+  // --------- CORE: collect question fields + answers[j].body ----------
+  function collectTranslatables(obj){
+    const FIELDS = ['title','text','explanationText','rightAnswerText','wrongAnswerText'];
+    const recs = [];
 
-  const questions = Array.isArray(obj.questions)
-    ? obj.questions
-    : (obj.lessonData && Array.isArray(obj.lessonData.questions) ? obj.lessonData.questions : []);
+    const questions = Array.isArray(obj.questions)
+      ? obj.questions
+      : (obj.lessonData && Array.isArray(obj.lessonData.questions) ? obj.lessonData.questions : []);
 
-  questions.forEach((q, i) => {
-    // 1) Question-level fields
-    FIELDS.forEach(field => {
-      const node = q?.[field];
-      if (node && typeof node === 'object' && !Array.isArray(node)){
-        const keys = Object.keys(node);
-        if (keys.some(isLocaleKey)){
-          const locales = keys.filter(isLocaleKey);
-          const baseLocale = locales.includes('en_US') ? 'en_US'
-                            : (locales.includes('basic') ? 'basic' : locales[0]);
-          recs.push({ path: `questions[${i}].${field}`, node, baseLocale });
+    questions.forEach((q, i) => {
+      // Question-level
+      FIELDS.forEach(field => {
+        const node = q?.[field];
+        if (node && typeof node === 'object' && !Array.isArray(node)){
+          const keys = Object.keys(node);
+          if (keys.some(isLocaleKey)){
+            const locales = keys.filter(isLocaleKey);
+            const baseLocale = locales.includes('en_US') ? 'en_US'
+                              : (locales.includes('basic') ? 'basic' : locales[0]);
+            recs.push({ path: `questions[${i}].${field}`, node, baseLocale, meta:{kind:'question', field} });
+          }
         }
-      }
-    });
+      });
 
-    // 2) Answer choices: answers[j].body
-    const answers = Array.isArray(q.answers) ? q.answers : [];
-    answers.forEach((ans, j) => {
-      const node = ans?.body;
-      if (node && typeof node === 'object' && !Array.isArray(node)){
-        const keys = Object.keys(node);
-        if (keys.some(isLocaleKey)){
-          const locales = keys.filter(isLocaleKey);
-          const baseLocale = locales.includes('en_US') ? 'en_US'
-                            : (locales.includes('basic') ? 'basic' : locales[0]);
-          recs.push({
-            path: `questions[${i}].answers[${j}].body`,
-            node,
-            baseLocale
-          });
+      // Answers
+      const answers = Array.isArray(q.answers) ? q.answers : [];
+      answers.forEach((ans, j) => {
+        const node = ans?.body;
+        if (node && typeof node === 'object' && !Array.isArray(node)){
+          const keys = Object.keys(node);
+          if (keys.some(isLocaleKey)){
+            const locales = keys.filter(isLocaleKey);
+            const baseLocale = locales.includes('en_US') ? 'en_US'
+                              : (locales.includes('basic') ? 'basic' : locales[0]);
+            recs.push({
+              path: `questions[${i}].answers[${j}].body`,
+              node,
+              baseLocale,
+              meta:{kind:'answer', isCorrect: ans?.isCorrect === true}
+            });
+          }
         }
-      }
+      });
     });
-  });
-
-  return recs;
-}
-
 
     return recs;
   }
@@ -250,7 +260,13 @@
       const tr = document.createElement('tr');
       const tdIdx = document.createElement('td'); tdIdx.textContent = String(idx); tr.appendChild(tdIdx);
 
-      const tdPath = document.createElement('td'); tdPath.className = 'path'; tdPath.title = rec.path; tdPath.textContent = rec.path; tr.appendChild(tdPath);
+      const tdPath = document.createElement('td'); tdPath.className = 'path'; tdPath.title = rec.path; tdPath.textContent = rec.path;
+      if (rec.meta?.kind === 'answer' && rec.meta.isCorrect){
+        const pill = document.createElement('span');
+        pill.className = 'pill'; pill.textContent = 'Correct'; pill.style.marginLeft = '6px';
+        tdPath.appendChild(pill);
+      }
+      tr.appendChild(tdPath);
 
       const tdBase = document.createElement('td'); tdBase.className = 'base';
       const baseArea = document.createElement('div'); baseArea.textContent = baseText; tdBase.appendChild(baseArea); tr.appendChild(tdBase);
@@ -333,6 +349,7 @@
     renderTable();
   }
 
+  // ---------- UI buttons ----------
   document.getElementById('btnLoadTextarea').addEventListener('click', () => {
     try{
       const raw = document.getElementById('jsonInput').value.trim();
@@ -366,17 +383,32 @@
     downloadCSV('lesson_strings.csv', rows);
   });
 
-  document.getElementById('localeSelect').addEventListener('change', renderTable);
-  document.getElementById('baseSelect').addEventListener('change', renderTable);
+  document.getElementById('localeSelect').addEventListener('change', () => { renderTable(); updateCounts(); });
+  document.getElementById('baseSelect').addEventListener('change', () => { renderTable(); updateCounts(); });
   document.getElementById('missingOnly').addEventListener('change', renderTable);
-  document.getElementById('search').addEventListener('input', () => { renderTable(); });
+  document.getElementById('search').addEventListener('input', renderTable);
 
-  // ————— GitHub integration —————
+  // ---------- GitHub integration ----------
   const ghStatus = (msg) => { document.getElementById('ghStatus').textContent = msg || ''; };
-  function ghReadToken(){ GITHUB.token = document.getElementById('ghToken').value.trim(); }
+  function ghReadToken(){
+    GITHUB.token = document.getElementById('ghToken').value.trim();
+    try { localStorage.setItem('ghToken', GITHUB.token || ''); } catch {}
+  }
+
+  // Try an action with Bearer first (fine-grained PAT), then legacy "token" (classic PAT)
+  async function withAuthTry(fn){
+    const t = (GITHUB.token||'').trim();
+    if (!t) throw new Error('Personal Access Token required.');
+    try { return await fn({ Authorization: `Bearer ${t}` }); }
+    catch (e1) {
+      const msg = String(e1 && e1.message || '');
+      if (!msg.includes('401')) throw e1;
+      return await fn({ Authorization: `token ${t}` });
+    }
+  }
 
   async function fetchSha(headers){
-    const url = `https://api.github.com/repos/${encodeURIComponent(GITHUB.owner)}/${encodeURIComponent(GITHUB.repo)}/contents/${GITHUB.path}?ref=${encodeURIComponent(GITHUB.branch)}`;
+    const url = `https://api.github.com/repos/${encodeURIComponent(GITHUB.owner)}/${encodeURIComponent(GITHUB.repo)}/contents/${encodeURIComponent(GITHUB.path)}?ref=${encodeURIComponent(GITHUB.branch)}`;
     const res = await fetch(url, { headers });
     if (res.status === 404) return '';
     if (!res.ok){ const t = await res.text().catch(()=> ''); throw new Error(`Pre-save sha fetch failed (${res.status}): ${t || res.statusText}`); }
@@ -386,79 +418,152 @@
 
   async function githubLoad(){
     ghReadToken(); ghStatus('Loading…');
-    const headers = { 'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28' };
-    if (GITHUB.token) headers.Authorization = `token ${GITHUB.token}`;
-    const url = `https://api.github.com/repos/${encodeURIComponent(GITHUB.owner)}/${encodeURIComponent(GITHUB.repo)}/contents/${GITHUB.path}?ref=${encodeURIComponent(GITHUB.branch)}`;
-    const res = await fetch(url, { headers });
-    if (res.status === 404){ ghStatus('File not found on repo/branch. Click “Save to GitHub” to create it.'); GITHUB.sha=''; return; }
-    if (!res.ok){ ghStatus(`Error ${res.status}: ${res.statusText}`); return; }
-    const data = await res.json();
-    if (!data.content){ ghStatus('No content in response.'); return; }
-    GITHUB.sha = data.sha;
-    const text = fromB64(data.content);
-    document.getElementById('jsonInput').value = text;
-    try {
-      const {lesson, wrapper} = extractLessonFromText(text);
-      WRAPPER = wrapper;
-      loadFromJSONObj(lesson);
-      ghStatus('Loaded ✔');
-    } catch(e){ ghStatus('Fetched, but parse failed: ' + e.message); }
+
+    await withAuthTry(async (auth) => {
+      const headers = { 'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28', ...auth };
+      const url = `https://api.github.com/repos/${encodeURIComponent(GITHUB.owner)}/${encodeURIComponent(GITHUB.repo)}/contents/${encodeURIComponent(GITHUB.path)}?ref=${encodeURIComponent(GITHUB.branch)}`;
+      const res = await fetch(url, { headers });
+
+      if (res.status === 404){ ghStatus('File not found on repo/branch. Click “Save to GitHub” to create it.'); GITHUB.sha=''; return; }
+      if (!res.ok){ ghStatus(`Error ${res.status}: ${await res.text().catch(()=>res.statusText)}`); return; }
+
+      const data = await res.json();
+      if (!data.content){ ghStatus('No content in response.'); return; }
+      GITHUB.sha = data.sha;
+      const text = fromB64Utf8(data.content);
+      document.getElementById('jsonInput').value = text;
+
+      try {
+        const {lesson, wrapper} = extractLessonFromText(text);
+        WRAPPER = wrapper;
+        loadFromJSONObj(lesson);
+        ghStatus('Loaded ✔');
+      } catch(e){ ghStatus('Fetched, but parse failed: ' + e.message); }
+    });
   }
 
   async function githubSave(){
     ghReadToken(); ghStatus('Saving…');
     if (!LESSON){ ghStatus('Load JSON before saving.'); return; }
-    if (!GITHUB.token){ ghStatus('Personal Access Token required to save.'); return; }
 
     const ensure = document.getElementById('ensureKeys').checked;
     const locale = document.getElementById('localeSelect').value;
     if (ensure){ for (const rec of RECORDS){ if (!(locale in rec.node)) rec.node[locale] = rec.node?.en_US ?? rec.node?.basic ?? ''; } }
 
     const json = JSON.stringify(LESSON, null, 2);
-    const contentText = WRAPPER.has ? ('var lessonData = ' + json + '\n') : json;
+    const contentText = WRAPPER.has ? ('var lessonData = ' + json + ';\n') : json;
 
-    const headers = {
-      'Accept': 'application/vnd.github+json',
-      'X-GitHub-Api-Version': '2022-11-28',
-      'Content-Type': 'application/json',
-      Authorization: `token ${GITHUB.token}`
-    };
+    await withAuthTry(async (auth) => {
+      const headers = {
+        'Accept': 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+        'Content-Type': 'application/json',
+        ...auth
+      };
 
-    let sha = '';
-    try{ sha = await fetchSha(headers); } catch(e){ ghStatus(e.message); return; }
+      // Always refresh sha
+      let sha = '';
+      try { sha = await fetchSha(headers); } catch(e){ ghStatus(e.message); return; }
 
-    const body = {
-      message: 'Update lesson translations',
-      content: toB64(contentText),
-      branch: GITHUB.branch,
-      ...(sha ? { sha } : {})
-    };
+      const body = {
+        message: 'Update lesson translations',
+        content: toB64Utf8(contentText),
+        branch: GITHUB.branch,
+        ...(sha ? { sha } : {})
+      };
 
-    const url = `https://api.github.com/repos/${encodeURIComponent(GITHUB.owner)}/${encodeURIComponent(GITHUB.repo)}/contents/${GITHUB.path}`;
-    const res = await fetch(url, { method: 'PUT', headers, body: JSON.stringify(body) });
+      const url = `https://api.github.com/repos/${encodeURIComponent(GITHUB.owner)}/${encodeURIComponent(GITHUB.repo)}/contents/${encodeURIComponent(GITHUB.path)}`;
+      let res = await fetch(url, { method: 'PUT', headers, body: JSON.stringify(body) });
 
-    if (!res.ok){
-      let msg = '';
-      try { const j = await res.json(); msg = j.message || ''; } catch {}
-      if (res.status === 401) { ghStatus('401 Unauthorized: Token missing/invalid or wrong scopes (use classic PAT with public_repo or repo). ' + (msg||'')); return; }
-      if (res.status === 403) { ghStatus('403 Forbidden: Branch protection or insufficient token scope. ' + (msg||'')); return; }
-      if (res.status === 409) {
-        try{ sha = await fetchSha(headers); }catch(e){ ghStatus('Retry failed fetching sha: ' + e.message); return; }
-        const body2 = { ...body, sha };
-        const res2 = await fetch(url, { method:'PUT', headers, body: JSON.stringify(body2) });
-        if (!res2.ok){ let m2=''; try{ const j2=await res2.json(); m2=j2.message||'';}catch{} ghStatus(`Save failed after retry (${res2.status}): ${m2||res2.statusText}`); return; }
-        const out2 = await res2.json(); GITHUB.sha = out2?.content?.sha || sha; ghStatus('Saved after retry ✔'); return;
+      if (res.status === 409){
+        // retry once after fresh sha
+        try { sha = await fetchSha(headers); } catch(e){ ghStatus('Retry failed fetching sha: ' + e.message); return; }
+        const body2 = { ...body, ...(sha ? { sha } : {}) };
+        res = await fetch(url, { method:'PUT', headers, body: JSON.stringify(body2) });
       }
-      ghStatus(`Save failed (${res.status}): ${msg || res.statusText}`); return;
-    }
 
-    const out = await res.json();
-    GITHUB.sha = out?.content?.sha || sha;
-    ghStatus('Saved ✔');
+      if (!res.ok){
+        const t = await res.text().catch(()=> '');
+        let msg = t; try { msg = JSON.parse(t).message || msg; } catch {}
+        if (res.status === 401) { ghStatus('401 Unauthorized: check token type/scopes and repo access. ' + msg); return; }
+        if (res.status === 403) { ghStatus('403 Forbidden: Branch protection or missing Contents: Read & write. ' + msg); return; }
+        if (res.status === 404) { ghStatus('404 Not Found: repo/branch/path not accessible for this token. ' + msg); return; }
+        ghStatus(`Save failed (${res.status}): ${msg || res.statusText}`); return;
+      }
+
+      const out = await res.json();
+      GITHUB.sha = out?.content?.sha || sha;
+      ghStatus('Saved ✔');
+    });
   }
 
   document.getElementById('btnGHLoad').addEventListener('click', () => { githubLoad().catch(e=>ghStatus('Load error: '+e.message)); });
   document.getElementById('btnGHSave').addEventListener('click', () => { githubSave().catch(e=>ghStatus('Save error: '+e.message)); });
+
+  // ---------- Auto-load behaviors ----------
+  // Paste-to-load anywhere
+  window.addEventListener('paste', (e) => {
+    const text = (e.clipboardData || window.clipboardData)?.getData('text');
+    if (!text) return;
+    try {
+      const obj = JSON.parse(text);
+      if (obj && typeof obj === 'object') {
+        LESSON = obj.lessonData || obj;
+        WRAPPER = {has:false,before:'',after:''};
+        loadFromJSONObj(LESSON);
+        $('#jsonInput').value = JSON.stringify(obj, null, 2);
+        ghStatus('JSON loaded from paste ✔');
+      }
+    } catch { /* not JSON; ignore */ }
+  });
+
+  function debounced(fn, ms=400){
+    let t; return (...args)=>{ clearTimeout(t); t=setTimeout(()=>fn(...args), ms); };
+  }
+
+  // Save token to localStorage and auto-load on first entry
+  const tokenInput = document.getElementById('ghToken');
+  tokenInput.addEventListener('input', debounced(() => {
+    ghReadToken();
+    if (GITHUB.token) githubLoad().catch(e=>ghStatus('Load error: '+e.message));
+  }, 500));
+
+  // Initial auto-load sequence
+  (function initAutoLoad(){
+    // 1) Global LESSON/lessonData
+    if (typeof window.LESSON !== 'undefined') {
+      try { loadFromJSONObj(window.LESSON); ghStatus('Loaded from global LESSON ✔'); return; } catch {}
+    }
+    if (typeof window.lessonData !== 'undefined') {
+      try { loadFromJSONObj(window.lessonData); ghStatus('Loaded from global lessonData ✔'); return; } catch {}
+    }
+
+    // 2) Textarea has content? (e.g., prefilled server-side)
+    const raw = $('#jsonInput').value.trim();
+    if (raw) {
+      try {
+        const {lesson, wrapper} = extractLessonFromText(raw);
+        WRAPPER = wrapper;
+        loadFromJSONObj(lesson);
+        ghStatus('Loaded from textarea ✔');
+        return;
+      } catch {}
+    }
+
+    // 3) Saved PAT → auto-load from GitHub
+    try {
+      const saved = localStorage.getItem('ghToken') || '';
+      if (saved) {
+        tokenInput.value = saved;
+        GITHUB.token = saved;
+        githubLoad().catch(e=>ghStatus('Load error: '+e.message));
+      } else {
+        ghStatus('Tip: paste a PAT to auto-load from GitHub.');
+      }
+    } catch {
+      ghStatus('Ready. Paste JSON or enter a PAT to load from GitHub.');
+    }
+  })();
 })();
 </script>
 </body>
