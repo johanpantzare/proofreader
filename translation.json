@@ -1424,7 +1424,7 @@ var lessonData = {
         "hu_HU": "<p>Melyik funkciót érinti a PWM9105 hibája?</p>",
         "hi_IN": "<p>यदि आपके पास PWM9105 पर कोई दोष है तो कौन सा कार्य प्रभावित होता है?</p>",
         "th_TH": "<p>ฟังก์ชันใดที่ได้รับผลกระทบหากคุณมีข้อผิดพลาดใน PWM9105</p>",
-        "sv_SE": "<p>Vilken funktion påverkas om du har ett fel på PWM9105?</p>",
+        "sv_SE": "<p>bajsfunktion påverkas om du har ett fel på PWM9105?</p>",
         "en_US": "<p>Which function is affected if you have a fault on PWM9105?</p>",
         "in_ID": "<p>Fungsi mana yang terpengaruh jika Anda memiliki kesalahan pada PWM9105?</p>",
         "cs_CZ": "<p>Která funkce je ovlivněna, pokud máte poruchu na PWM9105?</p>",
