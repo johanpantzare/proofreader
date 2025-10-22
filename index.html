@@ -3,595 +3,752 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Dare to Ask</title>
+  <title>Lesson JSON Translation Editor — v1.11.0</title>
   <style>
-    :root {
-      color-scheme: light dark;
-      --bg: #f5f7fb;
-      --card: #ffffff;
-      --brand: #0b1f44;
-      --accent: #3856d5;
-      --muted: #64748b;
-      --border: #d9e3f8;
-      --pill: #eff2ff;
-      --shadow: 0 14px 40px rgba(15, 23, 42, 0.15);
+    :root{
+      --brand:#081A35; --muted:#6b7280; --ok:#16a34a; --warn:#e11d48; --line:#e5e7eb; --bg:#f5f7fb;
+      --qhdr-bg:#eef3ff; --qhdr-fg:#0b2269; --qhdr-accent:#1f6feb; --card-bg:#fff;
     }
+    html,body{margin:0;padding:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Inter,Arial,sans-serif;background:var(--bg);color:#0f172a}
+    header{padding:16px 20px;background:var(--card-bg);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:10}
+    header h1{font-size:18px;margin:0 0 4px 0;color:var(--brand);display:flex;gap:10px;align-items:center}
+    header .ver{font-size:11px;color:#fff;background:#0f172a;border-radius:999px;padding:2px 8px}
+    header .sub{color:var(--muted);font-size:13px;display:flex;gap:12px;flex-wrap:wrap}
+    .b{font-weight:600;color:#0f172a}
 
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --bg: #0f172a;
-        --card: #111c34;
-        --brand: #eef2ff;
-        --accent: #6c8bff;
-        --muted: #cbd5f5;
-        --border: rgba(148, 163, 184, 0.35);
-        --pill: rgba(99, 102, 241, 0.2);
-        --shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
-      }
+    .container{max-width:1200px;margin:0 auto;padding:16px}
+    .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+    .toolbar > * {flex:0 0 auto}
+    select, input[type="text"], input[type="password"], textarea, button{border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:#fff;font:inherit}
+    button{cursor:pointer}
+    button.primary{background:var(--brand);color:#fff;border-color:transparent}
+    button.primary[disabled]{opacity:.6;cursor:not-allowed}
+    button.ghost{background:#fff}
+    label.chk{display:flex;gap:8px;align-items:center;font-size:13px;color:#334155}
+
+    details.box{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:12px}
+    details.box summary{cursor:pointer;font-weight:600}
+    textarea#jsonInput{width:100%;min-height:160px;font-family:ui-monospace,SFMono-Regular,Consolas,Monaco,monospace}
+
+    .status{font-size:12px;color:var(--muted)}
+    .pill{display:inline-block;border-radius:999px;padding:2px 8px;font-size:12px;border:1px solid var(--line);background:#fff}
+
+    /* Question section (header + rows card) */
+    .qsection{margin:16px 0;border:1px solid var(--line);border-radius:12px;background:var(--card-bg);overflow:hidden}
+    .qhdr{
+      display:flex;align-items:center;gap:10px;
+      background:var(--qhdr-bg); color:var(--qhdr-fg);
+      padding:12px 14px; font-size:16px; font-weight:800;
+      cursor:pointer; user-select:none;
+      border-bottom:1px solid var(--line);
     }
+    .qhdr .chev{display:inline-flex;align-items:center;justify-content:center}
+    .qhdr .chev svg{width:22px;height:22px;stroke:var(--qhdr-accent);stroke-width:2.5}
+    .qhdr .title{margin-right:auto}
+    .qhdr .meta{font-weight:600;opacity:.85;font-size:13px;color:#334155}
+    .qrows{width:100%}
+    .row{display:grid;grid-template-columns:44px minmax(220px, 1fr) 1.5fr 1.5fr 80px;gap:0;border-bottom:1px solid var(--line)}
+    .row > div{padding:8px}
+    .row:nth-child(odd){background:#fcfdff}
+    .idx{color:#475569}
+    .item{font-size:13px}
+    .base, .loc{min-width:200px}
+    textarea.edit{width:100%;min-height:60px;resize:vertical;font-family:inherit}
+    .len{color:#475569;font-size:12px;text-align:right;display:flex;align-items:center;justify-content:flex-end;padding-right:12px}
 
-    * { box-sizing: border-box; }
-
-    body {
-      margin: 0;
-      font-family: 'Inter', 'Segoe UI', Roboto, sans-serif;
-      background: var(--bg);
-      color: var(--brand);
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-    }
-
-    header {
-      padding: 48px 24px 24px;
-      text-align: center;
-    }
-
-    header h1 {
-      margin: 0;
-      font-size: clamp(2.25rem, 3vw, 3rem);
-      letter-spacing: -0.02em;
-    }
-
-    header p {
-      margin: 14px auto 0;
-      max-width: 680px;
-      color: var(--muted);
-      font-size: clamp(1rem, 2vw, 1.15rem);
-      line-height: 1.6;
-    }
-
-    main {
-      flex: 1;
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-      gap: 32px;
-      padding: 0 24px 80px;
-      max-width: 1200px;
-      margin: 0 auto;
-    }
-
-    .card {
-      background: var(--card);
-      border-radius: 18px;
-      padding: 28px;
-      border: 1px solid var(--border);
-      box-shadow: var(--shadow);
-      display: flex;
-      flex-direction: column;
-      gap: 22px;
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    .card:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 20px 40px rgba(56, 86, 213, 0.18);
-    }
-
-    .card h2 {
-      margin: 0;
-      font-size: 1.25rem;
-      letter-spacing: -0.01em;
-    }
-
-    form {
-      display: grid;
-      gap: 18px;
-    }
-
-    label {
-      display: grid;
-      gap: 8px;
-      font-weight: 600;
-      color: var(--brand);
-    }
-
-    input, textarea {
-      border-radius: 12px;
-      padding: 14px 16px;
-      border: 1px solid var(--border);
-      font: inherit;
-      background: rgba(255, 255, 255, 0.85);
-      color: inherit;
-      transition: border-color 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    input:focus, textarea:focus {
-      outline: none;
-      border-color: var(--accent);
-      box-shadow: 0 0 0 4px rgba(56, 86, 213, 0.18);
-    }
-
-    textarea {
-      resize: vertical;
-      min-height: 140px;
-    }
-
-    button {
-      border: none;
-      border-radius: 999px;
-      padding: 14px 20px;
-      font-size: 1rem;
-      font-weight: 600;
-      font-family: inherit;
-      cursor: pointer;
-      background: linear-gradient(135deg, var(--accent), #111cfe);
-      color: #fff;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    button:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 12px 24px rgba(17, 28, 254, 0.25);
-    }
-
-    button:disabled {
-      opacity: 0.65;
-      cursor: not-allowed;
-      transform: none;
-      box-shadow: none;
-    }
-
-    .pill {
-      display: inline-flex;
-      padding: 6px 12px;
-      border-radius: 999px;
-      background: var(--pill);
-      font-size: 0.75rem;
-      font-weight: 600;
-      color: var(--accent);
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-    }
-
-    .question-list {
-      display: flex;
-      flex-direction: column;
-      gap: 18px;
-      max-height: 80vh;
-      overflow-y: auto;
-      padding-right: 4px;
-    }
-
-    .question {
-      padding: 20px;
-      border-radius: 16px;
-      border: 1px solid var(--border);
-      background: rgba(255, 255, 255, 0.7);
-      display: grid;
-      gap: 14px;
-    }
-
-    .question header {
-      padding: 0;
-      text-align: left;
-    }
-
-    .question h3 {
-      margin: 0;
-      font-size: 1.05rem;
-    }
-
-    .question footer {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-      flex-wrap: wrap;
-      font-size: 0.9rem;
-      color: var(--muted);
-    }
-
-    .question footer button {
-      padding: 8px 14px;
-      font-size: 0.9rem;
-      border-radius: 999px;
-      background: rgba(17, 28, 254, 0.08);
-      color: var(--accent);
-      box-shadow: none;
-      transition: background 0.2s ease, color 0.2s ease;
-    }
-
-    .question footer button:hover {
-      background: rgba(17, 28, 254, 0.18);
-    }
-
-    .question footer button.voted {
-      background: var(--accent);
-      color: #fff;
-    }
-
-    .question .answer {
-      border-left: 4px solid var(--accent);
-      padding-left: 14px;
-      color: var(--brand);
-      line-height: 1.55;
-    }
-
-    .empty-state {
-      text-align: center;
-      padding: 32px;
-      border: 1px dashed var(--border);
-      border-radius: 16px;
-      color: var(--muted);
-    }
-
-    .filters {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      align-items: center;
-    }
-
-    .filters input {
-      min-width: 200px;
-    }
-
-    .radio-group {
-      display: inline-flex;
-      background: rgba(17, 28, 254, 0.06);
-      padding: 4px;
-      border-radius: 999px;
-      gap: 4px;
-    }
-
-    .radio-group label {
-      margin: 0;
-      font-weight: 600;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 12px;
-      border-radius: 999px;
-      cursor: pointer;
-      color: var(--accent);
-      transition: background 0.2s ease, color 0.2s ease;
-    }
-
-    .radio-group input {
-      display: none;
-    }
-
-    .radio-group label.active {
-      background: #fff;
-      color: var(--accent);
-      box-shadow: 0 6px 14px rgba(56, 86, 213, 0.18);
-    }
-
-    .meta-line {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      font-size: 0.85rem;
-      color: var(--muted);
-    }
-
-    @media (max-width: 768px) {
-      main {
-        padding-bottom: 48px;
-      }
-
-      .card {
-        padding: 24px;
-      }
-
-      .question-list {
-        max-height: none;
-      }
-    }
+    .footer{display:flex;gap:10px;justify-content:space-between;margin-top:12px;align-items:center}
+    .counter{font-size:12px;color:#334155}
+    .saving{color:#0b5f15}
+    .error{color:#b91c1c}
   </style>
 </head>
 <body>
   <header>
-    <span class="pill">Ask bravely</span>
-    <h1>Dare to Ask</h1>
-    <p>
-      A trusted space for curious minds. Drop an anonymous question for our subject-matter experts, discover what others are
-      wondering, and help us prioritise the next answers with an upvote.
-    </p>
+    <h1>
+      Lesson JSON Translation Editor
+      <span class="ver">v1.11.0</span>
+    </h1>
+    <div class="sub">
+      <span>Deep-link with <code>?lang=sv_SE</code> • <code>?showMeta=1</code> shows explanation/right/wrong</span>
+      <span id="qTotal" class="b"></span>
+    </div>
   </header>
 
-  <main>
-    <section class="card" aria-labelledby="ask-title">
-      <div>
-        <h2 id="ask-title">Ask a question</h2>
-        <p style="margin: 8px 0 0; color: var(--muted);">
-          No sign-in required. We share questions with SMEs daily and publish answers as soon as they arrive.
-        </p>
+  <div class="container">
+    <details class="box" open>
+      <summary>Load / Paste JSON</summary>
+      <div class="status">Auto-load: global <code>LESSON</code>/<code>lessonData</code> → textarea → GitHub (if saved PAT). You can also paste JSON anywhere on the page.</div>
+      <div class="toolbar">
+        <button id="btnLoadTextarea" class="ghost">Load JSON from textarea</button>
+        <button id="btnDownload" class="ghost">Export Updated JSON</button>
+        <button id="btnCSV" class="ghost">Export CSV (visible rows)</button>
       </div>
-      <form id="askForm">
-        <label>
-          Question <span style="color:#ef4444">*</span>
-          <textarea name="question" placeholder="What would you like to know?" maxlength="400" required></textarea>
-        </label>
-        <label>
-          Context for SMEs
-          <textarea name="details" placeholder="Optional background that helps experts provide a thoughtful answer" maxlength="800"></textarea>
-        </label>
-        <label>
-          Topic tag
-          <input name="tag" type="text" placeholder="e.g. Compliance, Product, HR" maxlength="40" />
-        </label>
-        <button type="submit">Submit anonymously</button>
-        <p id="formStatus" role="status" style="margin:0;font-size:0.9rem;color:var(--muted);"></p>
-      </form>
-    </section>
+      <textarea id="jsonInput" placeholder='Paste the JSON for your lesson here (either the object itself, {"lessonData": ...}, or a JS file that assigns to lessonData).'></textarea>
+    </details>
 
-    <section class="card" aria-live="polite">
-      <div style="display:flex;flex-direction:column;gap:10px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:18px;flex-wrap:wrap;">
-          <h2 style="margin:0;">Questions from the community</h2>
-          <span id="questionCount" class="pill" aria-live="polite"></span>
-        </div>
-        <div class="filters">
-          <input id="search" type="search" placeholder="Search questions" aria-label="Search questions" />
-          <div class="radio-group" role="radiogroup" aria-label="Filter questions">
-            <label class="active"><input type="radio" name="filter" value="all" checked /> All</label>
-            <label><input type="radio" name="filter" value="unanswered" /> Awaiting answer</label>
-            <label><input type="radio" name="filter" value="answered" /> Answered</label>
-          </div>
-        </div>
+    <details class="box" open>
+      <summary>GitHub</summary>
+      <div class="status">Repo details are preconfigured. Enter your <strong>Personal Access Token</strong> (fine-grained or classic). Token is saved to localStorage for auto-load next visit.</div>
+      <div class="toolbar">
+        <input id="ghToken" type="password" placeholder="Personal Access Token" style="min-width:320px" />
+        <button id="btnGHLoad" class="ghost">Load from GitHub</button>
+        <button id="btnGHSave" class="primary">Save to GitHub</button>
+        <label class="chk" title="Debounced ~1.2s after typing stops"><input type="checkbox" id="autoSave"/> Auto-save</label>
       </div>
-      <div id="questionList" class="question-list" aria-live="polite"></div>
-    </section>
-  </main>
+      <div class="status" id="ghStatus">—</div>
+    </details>
 
-  <template id="questionTemplate">
-    <article class="question">
-      <header>
-        <div class="meta-line">
-          <span class="pill" data-tag></span>
-          <span data-status></span>
-          <span data-timestamp></span>
-        </div>
-        <h3 data-question></h3>
-      </header>
-      <p data-details style="margin:0;color:var(--muted);"></p>
-      <div class="answer" data-answer></div>
-      <footer>
-        <button type="button" data-upvote>
-          <span aria-hidden="true">⬆️</span> Upvote
-        </button>
-        <span data-count></span>
-        <button type="button" data-answer-btn style="margin-left:auto;background:rgba(16,185,129,0.12);color:#047857;">
-          Add answer
-        </button>
-      </footer>
-    </article>
-  </template>
+    <div class="toolbar">
+      <label>Locale
+        <select id="localeSelect"></select>
+      </label>
+      <label>Base (comparison)
+        <select id="baseSelect"></select>
+      </label>
+      <input id="search" type="text" placeholder="Search item text…" />
+      <label class="chk"><input type="checkbox" id="missingOnly"/> Show missing/empty only</label>
+      <label class="chk"><input type="checkbox" id="ensureKeys"/> Ensure keys exist for selected locale when exporting/saving</label>
+      <label class="chk"><input type="checkbox" id="hideMeta"/> Hide explanation/right/wrong</label>
 
-  <script>
-    const form = document.getElementById('askForm');
-    const statusEl = document.getElementById('formStatus');
-    const listEl = document.getElementById('questionList');
-    const template = document.getElementById('questionTemplate');
-    const searchInput = document.getElementById('search');
-    const radioLabels = document.querySelectorAll('.radio-group label');
-    const countEl = document.getElementById('questionCount');
+      <button id="btnExpandAll" class="ghost">Expand all</button>
+      <button id="btnCollapseAll" class="ghost">Collapse all</button>
 
-    const STORAGE_KEY = 'dare-to-ask-questions-v1';
-    const VOTE_KEY = 'dare-to-ask-votes';
+      <span id="counts" class="counter">—</span>
+    </div>
 
-    const sampleQuestions = [
-      {
-        id: crypto.randomUUID(),
-        question: 'How does the new risk assessment framework affect day-to-day decision making?',
-        details: 'I have seen the deck, but still unsure how to apply the tiers when signing off initiatives.',
-        tag: 'Risk & Compliance',
-        createdAt: Date.now() - 1000 * 60 * 60 * 4,
-        votes: 12,
-        answer: 'Great question! The short version is that every initiative now starts with a self-assessment against the three-tier matrix. If an activity touches customer data or regulatory commitments it automatically escalates to Tier 2 for SME review. We are rolling out a lightweight checklist next Monday to make this easier.',
-      },
-      {
-        id: crypto.randomUUID(),
-        question: 'What support is available for managers preparing performance reviews this cycle?',
-        details: 'We have several new team leads who are nervous about the new template.',
-        tag: 'People',
-        createdAt: Date.now() - 1000 * 60 * 60 * 24,
-        votes: 7,
-        answer: '',
+    <!-- Question sections will be injected here -->
+    <div id="sections"></div>
+
+    <div class="footer">
+      <span class="counter" id="footerCounts">—</span>
+      <span class="counter" id="visibleQ">—</span>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const VERSION = 'v1.11.0';
+  const $ = (s, r = document) => r.querySelector(s);
+  const isLocaleKey = (k) => k === 'basic' || /^[a-z]{2}_[A-Z]{2}$/.test(k);
+  const storage = {
+    get(k, d){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch{ return d; } },
+    set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch{} }
+  };
+
+  // UTF-8 safe Base64
+  function toB64Utf8(str){
+    const bytes = new TextEncoder().encode(str);
+    let bin = ''; for (let i=0;i<bytes.length;i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin);
+  }
+  function fromB64Utf8(b64){
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+    return new TextDecoder().decode(bytes);
+  }
+
+  // GitHub target (hidden)
+  const GITHUB = { owner:'johanpantzare', repo:'video-course', branch:'master', path:'translation.json', token:'', sha:'' };
+
+  let LESSON = null, RECORDS = [], LOCALES = new Set(), WRAPPER = { has:false, before:'', after:'' };
+  let QINFO = [];
+  let collapsed = new Set(storage.get('collapsedQs', []));
+  let lastSavedB64 = ''; // content last saved
+  let isSaving = false;
+  let saveQueued = false;
+
+  // ——— Helpers
+  function download(filename, text, type='application/json'){
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], {type}));
+    a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+  function downloadCSV(filename, rows){
+    const esc = (s) => '"' + (String(s??'').replaceAll('"','""')) + '"';
+    const header = ['#','question','item','path','baseLocale','base','locale','value'].map(esc).join(',');
+    const lines = rows.map(r => [r.idx, r.qnum, r.item, r.path, r.baseLocale, r.base, r.locale, r.value].map(esc).join(','));
+    const csv = [header, ...lines].join('\n');
+    download(filename, csv, 'text/csv');
+  }
+  function traverse(obj, cb, path = ''){
+    cb(obj, path);
+    if (Array.isArray(obj)){
+      obj.forEach((v,i) => traverse(v, cb, path + '[' + i + ']'));
+    } else if (obj && typeof obj === 'object'){
+      for (const [k,v] of Object.entries(obj)){
+        traverse(v, cb, path + (path?'.':'') + k);
       }
-    ];
-
-    const loadQuestions = () => {
-      try {
-        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
-        return Array.isArray(saved) ? saved : sampleQuestions;
-      } catch (error) {
-        console.error('Failed to read storage', error);
-        return sampleQuestions;
+    }
+  }
+  function collectLocales(obj){
+    try{ (obj.languages||[]).forEach(x => x?.locale && LOCALES.add(x.locale)); }catch{}
+    traverse(obj, (node) => {
+      if (node && typeof node === 'object' && !Array.isArray(node)){
+        const keys = Object.keys(node);
+        if (keys.some(isLocaleKey)){
+          keys.filter(isLocaleKey).forEach(k => LOCALES.add(k));
+        }
       }
-    };
+    });
+  }
+  function labelFor(rec){
+    if (rec.meta?.kind === 'answer'){
+      return `Answer ${Number(rec.meta.position)+1}`;
+    }
+    const f = rec.meta?.field;
+    if (f === 'text') return 'Question';
+    if (f === 'title') return 'Title';
+    if (f === 'explanationText') return 'Explanation';
+    if (f === 'rightAnswerText') return 'Right answer text';
+    if (f === 'wrongAnswerText') return 'Wrong answer text';
+    return f || rec.path;
+  }
+  function collectTranslatables(obj){
+    const FIELDS = ['title','text','explanationText','rightAnswerText','wrongAnswerText'];
+    const recs = [];
+    const questions = Array.isArray(obj.questions)
+      ? obj.questions
+      : (obj.lessonData && Array.isArray(obj.lessonData.questions) ? obj.lessonData.questions : []);
 
-    const saveQuestions = (items) => {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-    };
+    QINFO = questions.map(q => ({
+      id: q?.id ?? '',
+      type: q?.questionType ?? '',
+      answersCount: Array.isArray(q?.answers) ? q.answers.length : 0
+    }));
 
-    const loadVotes = () => {
-      try {
-        const saved = JSON.parse(localStorage.getItem(VOTE_KEY));
-        return saved && typeof saved === 'object' ? saved : {};
-      } catch {
-        return {};
-      }
-    };
-
-    const saveVotes = (votes) => {
-      localStorage.setItem(VOTE_KEY, JSON.stringify(votes));
-    };
-
-    let questions = loadQuestions();
-    let votes = loadVotes();
-    let activeFilter = 'all';
-    let searchTerm = '';
-
-    const timeAgo = (timestamp) => {
-      const delta = Math.max(0, Date.now() - timestamp);
-      const minute = 60 * 1000;
-      const hour = 60 * minute;
-      const day = 24 * hour;
-      if (delta < minute) return 'just now';
-      if (delta < hour) {
-        const mins = Math.round(delta / minute);
-        return `${mins} minute${mins === 1 ? '' : 's'} ago`;
-      }
-      if (delta < day) {
-        const hours = Math.round(delta / hour);
-        return `${hours} hour${hours === 1 ? '' : 's'} ago`;
-      }
-      const days = Math.round(delta / day);
-      return `${days} day${days === 1 ? '' : 's'} ago`;
-    };
-
-    const renderQuestions = () => {
-      listEl.innerHTML = '';
-      let filtered = questions;
-
-      if (activeFilter === 'unanswered') {
-        filtered = filtered.filter(q => !q.answer);
-      } else if (activeFilter === 'answered') {
-        filtered = filtered.filter(q => !!q.answer);
-      }
-
-      if (searchTerm) {
-        const query = searchTerm.toLowerCase();
-        filtered = filtered.filter(q =>
-          q.question.toLowerCase().includes(query) ||
-          (q.details && q.details.toLowerCase().includes(query)) ||
-          (q.tag && q.tag.toLowerCase().includes(query))
-        );
-      }
-
-      countEl.textContent = `${filtered.length} question${filtered.length === 1 ? '' : 's'}`;
-
-      if (!filtered.length) {
-        listEl.innerHTML = '<div class="empty-state">No questions yet. Be the first to ask something brave!</div>';
-        return;
-      }
-
-      const frag = document.createDocumentFragment();
-      filtered
-        .sort((a, b) => b.votes - a.votes || b.createdAt - a.createdAt)
-        .forEach(q => {
-          const instance = template.content.cloneNode(true);
-          const tagEl = instance.querySelector('[data-tag]');
-          const statusEl = instance.querySelector('[data-status]');
-          const timestampEl = instance.querySelector('[data-timestamp]');
-          const qEl = instance.querySelector('[data-question]');
-          const detailsEl = instance.querySelector('[data-details]');
-          const answerEl = instance.querySelector('[data-answer]');
-          const upvoteBtn = instance.querySelector('[data-upvote]');
-          const countEl = instance.querySelector('[data-count]');
-          const answerBtn = instance.querySelector('[data-answer-btn]');
-
-          tagEl.textContent = q.tag || 'General';
-          statusEl.textContent = q.answer ? 'Answered' : 'Awaiting answer';
-          timestampEl.textContent = timeAgo(q.createdAt);
-          qEl.textContent = q.question;
-          detailsEl.textContent = q.details || '';
-          detailsEl.style.display = q.details ? 'block' : 'none';
-          answerEl.textContent = q.answer;
-          answerEl.style.display = q.answer ? 'block' : 'none';
-          countEl.textContent = `${q.votes} upvote${q.votes === 1 ? '' : 's'}`;
-
-          if (votes[q.id]) {
-            upvoteBtn.classList.add('voted');
-            upvoteBtn.textContent = '⬆️ Upvoted';
+    questions.forEach((q, i) => {
+      FIELDS.forEach(field => {
+        const node = q?.[field];
+        if (node && typeof node === 'object' && !Array.isArray(node)){
+          const keys = Object.keys(node);
+          if (keys.some(isLocaleKey)){
+            const locales = keys.filter(isLocaleKey);
+            const baseLocale = locales.includes('en_US') ? 'en_US' : (locales.includes('basic') ? 'basic' : locales[0]);
+            recs.push({ qIndex:i, path:`questions[${i}].${field}`, node, baseLocale, meta:{kind:'question', field} });
           }
-
-          upvoteBtn.addEventListener('click', () => {
-            if (votes[q.id]) return;
-            q.votes += 1;
-            votes[q.id] = true;
-            saveVotes(votes);
-            saveQuestions(questions);
-            renderQuestions();
-          });
-
-          answerBtn.addEventListener('click', () => {
-            const answer = prompt('Add an answer to share with everyone:');
-            if (answer && answer.trim()) {
-              q.answer = answer.trim();
-              saveQuestions(questions);
-              renderQuestions();
-            }
-          });
-
-          frag.appendChild(instance);
-        });
-
-      listEl.appendChild(frag);
-    };
-
-    form.addEventListener('submit', (event) => {
-      event.preventDefault();
-      const data = new FormData(form);
-      const question = (data.get('question') || '').trim();
-      const details = (data.get('details') || '').trim();
-      const tag = (data.get('tag') || '').trim();
-
-      if (!question) {
-        statusEl.textContent = 'Please enter a question before submitting.';
-        return;
-      }
-
-      const newQuestion = {
-        id: crypto.randomUUID(),
-        question,
-        details,
-        tag,
-        createdAt: Date.now(),
-        votes: 0,
-        answer: '',
-      };
-
-      questions.unshift(newQuestion);
-      saveQuestions(questions);
-      form.reset();
-      statusEl.textContent = 'Thanks! Your question has been queued for our SMEs.';
-      renderQuestions();
-      setTimeout(() => statusEl.textContent = '', 4000);
-    });
-
-    searchInput.addEventListener('input', (event) => {
-      searchTerm = event.target.value;
-      renderQuestions();
-    });
-
-    document.querySelectorAll('input[name="filter"]').forEach((input, index) => {
-      input.addEventListener('change', () => {
-        activeFilter = input.value;
-        radioLabels.forEach(label => label.classList.remove('active'));
-        radioLabels[index].classList.add('active');
-        renderQuestions();
+        }
+      });
+      const answers = Array.isArray(q.answers) ? q.answers : [];
+      answers.forEach((ans, j) => {
+        const node = ans?.body;
+        if (node && typeof node === 'object' && !Array.isArray(node)){
+          const keys = Object.keys(node);
+          if (keys.some(isLocaleKey)){
+            const locales = keys.filter(isLocaleKey);
+            const baseLocale = locales.includes('en_US') ? 'en_US' : (locales.includes('basic') ? 'basic' : locales[0]);
+            recs.push({ qIndex:i, path:`questions[${i}].answers[${j}].body`, node, baseLocale, meta:{kind:'answer', isCorrect: ans?.isCorrect === true, position:j} });
+          }
+        }
       });
     });
+    return recs;
+  }
+  function populateLocaleSelects(){
+    const locs = Array.from(LOCALES).sort();
+    const sel = $('#localeSelect'), baseSel = $('#baseSelect');
+    sel.innerHTML = ''; baseSel.innerHTML = '';
+    for (const l of locs){
+      const o1 = document.createElement('option'); o1.value = l; o1.textContent = l; sel.appendChild(o1);
+      const o2 = document.createElement('option'); o2.value = l; o2.textContent = l; baseSel.appendChild(o2);
+    }
+    sel.value = locs.includes('sv_SE') ? 'sv_SE' : (locs.includes('en_US')?'en_US':locs[0]||'en_US');
+    baseSel.value = locs.includes('en_US') ? 'en_US' : (locs.includes('basic')?'basic':locs[0]||'en_US');
+  }
+  function setUrlLangParam(lang){
+    try{
+      const u = new URL(location.href);
+      if (lang) u.searchParams.set('lang', lang); else u.searchParams.delete('lang');
+      history.replaceState(null, '', u.toString());
+    }catch{}
+  }
 
-    renderQuestions();
-  </script>
+  function renderTable(){
+    const locale = $('#localeSelect').value;
+    const base = $('#baseSelect').value;
+    const q = $('#search').value.trim().toLowerCase();
+    const missingOnly = $('#missingOnly').checked;
+    const hideMeta = $('#hideMeta').checked;
+
+    const host = $('#sections');
+    host.innerHTML = '';
+    const frag = document.createDocumentFragment();
+
+    // Group records by question index
+    const byQ = new Map();
+    for (const rec of RECORDS){
+      if (hideMeta && /\.(explanationText|rightAnswerText|wrongAnswerText)$/.test(rec.path)) continue;
+      (byQ.get(rec.qIndex) || byQ.set(rec.qIndex, []).get(rec.qIndex)).push(rec);
+    }
+    const orderKey = (rec) => {
+      if (rec.meta?.kind === 'answer') return 200 + (rec.meta.position ?? 0);
+      const f = rec.meta?.field;
+      if (f === 'title') return 10;
+      if (f === 'text') return 20;
+      if (f === 'explanationText') return 500;
+      if (f === 'rightAnswerText') return 510;
+      if (f === 'wrongAnswerText') return 520;
+      return 999;
+    };
+    for (const arr of byQ.values()) arr.sort((a,b)=>orderKey(a)-orderKey(b));
+
+    let idx = 0, shown = 0, missing = 0;
+    const rowsForCSV = [];
+    const visibleQuestions = new Set();
+
+    const totalQuestions = QINFO.length;
+    for (let qi = 0; qi < totalQuestions; qi++){
+      const recs = byQ.get(qi) || [];
+
+      // Check visibility by filters
+      let hasVisibleRow = false;
+      for (const rec of recs){
+        const baseText = rec.node?.[base] ?? '';
+               const locText = rec.node?.[locale] ?? '';
+        const isMissing = (locText ?? '') === '';
+        const hay = (labelFor(rec) + ' ' + baseText + ' ' + locText).toLowerCase();
+        if (q && !hay.includes(q)) continue;
+        if (missingOnly && !isMissing) continue;
+        hasVisibleRow = true; break;
+      }
+      if (!hasVisibleRow) continue;
+
+      visibleQuestions.add(qi);
+
+      // Section
+      const section = document.createElement('div');
+      section.className = 'qsection';
+      section.dataset.qindex = String(qi);
+
+      // Header (full width)
+      const qmeta = QINFO[qi] || {};
+      const isCollapsed = collapsed.has(qi);
+      const qhdr = document.createElement('div');
+      qhdr.className = 'qhdr';
+      qhdr.setAttribute('role','button');
+      qhdr.setAttribute('tabindex','0');
+      qhdr.innerHTML = `
+        <span class="chev" aria-hidden="true">
+          ${isCollapsed
+            ? '<svg viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6"/></svg>'  /* down (expand) */
+            : '<svg viewBox="0 0 24 24" fill="none"><path d="M6 15l6-6 6 6"/></svg>' /* up (collapse) */
+          }
+        </span>
+        <span class="title">Question ${qi+1} of ${totalQuestions}</span>
+        <span class="meta">ID ${qmeta.id ?? ''} • ${qmeta.type || ''} • ${qmeta.answersCount||0} answers</span>
+      `;
+      const toggle = () => {
+        if (collapsed.has(qi)) collapsed.delete(qi); else collapsed.add(qi);
+        storage.set('collapsedQs', Array.from(collapsed));
+        renderTable();
+      };
+      qhdr.addEventListener('click', toggle);
+      qhdr.addEventListener('keydown', (e)=>{ if (e.key==='Enter' || e.key===' ') { e.preventDefault(); toggle(); }});
+      section.appendChild(qhdr);
+
+      // Rows
+      if (!isCollapsed){
+        const rows = document.createElement('div');
+        rows.className = 'qrows';
+
+        for (const rec of recs){
+          const baseText = rec.node?.[base] ?? '';
+          const locText = rec.node?.[locale] ?? '';
+          const isMissing = (locText ?? '') === '';
+          if (isMissing) missing++;
+
+          const hay = (labelFor(rec) + ' ' + baseText + ' ' + locText).toLowerCase();
+          if (q && !hay.includes(q)) continue;
+          if (missingOnly && !isMissing) continue;
+
+          shown++; idx++;
+
+          const row = document.createElement('div');
+          row.className = 'row';
+
+          const cIdx = document.createElement('div'); cIdx.className='idx'; cIdx.textContent = String(idx);
+          const cItem = document.createElement('div'); cItem.className='item';
+          const label = document.createElement('span'); label.textContent = labelFor(rec);
+          cItem.appendChild(label);
+          if (rec.meta?.kind === 'answer' && rec.meta.isCorrect){
+            const pill = document.createElement('span');
+            pill.className = 'pill'; pill.textContent = 'Correct'; pill.style.marginLeft = '6px';
+            cItem.appendChild(pill);
+          }
+
+          const cBase = document.createElement('div'); cBase.className='base'; cBase.textContent = baseText;
+
+          const cLoc = document.createElement('div'); cLoc.className='loc';
+          const ta = document.createElement('textarea');
+          ta.className = 'edit'; ta.value = locText ?? '';
+          const collapseByDefault = /\.(explanationText|rightAnswerText|wrongAnswerText)$/.test(rec.path);
+          if (collapseByDefault){
+            ta.style.height = '22px';
+            ta.style.overflow = 'hidden';
+            ta.style.resize = 'none';
+            ta.addEventListener('focus', () => {
+              ta.style.height = '60px';
+              ta.style.overflow = 'auto';
+              ta.style.resize = 'vertical';
+            }, {once:true});
+          }
+          ta.addEventListener('input', (e) => {
+            rec.node[locale] = e.target.value;
+            updateCounts();
+            cLen.textContent = String(e.target.value.length);
+            touchDirty(); // for auto-save
+          });
+          cLoc.appendChild(ta);
+
+          const cLen = document.createElement('div'); cLen.className='len'; cLen.textContent = String((ta.value||'').length);
+
+          row.append(cIdx, cItem, cBase, cLoc, cLen);
+          rows.appendChild(row);
+        }
+        section.appendChild(rows);
+      }
+
+      frag.appendChild(section);
+    }
+
+    host.appendChild(frag);
+
+    $('#counts').textContent = `${shown} items · ${missing} missing in ${$('#localeSelect').value}`;
+    $('#footerCounts').textContent = `${RECORDS.length} total translatable items`;
+    const collapsedCount = Array.from(collapsed).filter(x => x >=0 && x < QINFO.length).length;
+    $('#visibleQ').textContent = `${QINFO.length - collapsedCount} visible / ${QINFO.length} total questions`;
+
+    host.dataset.csv = JSON.stringify([]); // CSV is rebuilt on demand now
+  }
+
+  function updateCounts(){
+    const locale = $('#localeSelect').value;
+    const hideMeta = $('#hideMeta').checked;
+    let missing = 0, total = 0;
+    for (const rec of RECORDS){
+      if (hideMeta && /\.(explanationText|rightAnswerText|wrongAnswerText)$/.test(rec.path)) continue;
+      total++;
+      if ((rec.node?.[locale]??'') === '') missing++;
+    }
+    $('#counts').textContent = `${total} items · ${missing} missing in ${locale}`;
+  }
+
+  function extractLessonFromText(text){
+    const t = text.trim();
+    if (t.startsWith('{')){
+      const obj = JSON.parse(t);
+      return { lesson: obj.lessonData || obj, wrapper:{has:false,before:'',after:''} };
+    }
+    const idx = t.search(/\b(?:var|let|const)\s+lessonData\s*=/);
+    if (idx === -1) throw new Error('Not valid JSON and no "lessonData" assignment found.');
+    const braceStart = t.indexOf('{', idx);
+    if (braceStart === -1) throw new Error('Could not find opening { after lessonData =');
+    let i = braceStart, depth = 0, inStr = false, strCh = '', esc = false;
+    for (; i < t.length; i++){
+      const ch = t[i];
+      if (inStr){
+        if (esc){ esc = false; }
+        else if (ch === '\\'){ esc = true; }
+        else if (ch === strCh){ inStr = false; strCh = ''; }
+      } else {
+        if (ch === '"' || ch === "'"){ inStr = true; strCh = ch; }
+        else if (ch === '{'){ depth++; }
+        else if (ch === '}'){ depth--; if (depth === 0) { i++; break; } }
+      }
+    }
+    if (depth !== 0) throw new Error('Unbalanced braces in file.');
+    const jsonText = t.slice(braceStart, i);
+    const before = t.slice(0, braceStart);
+    const after  = t.slice(i).replace(/^[\s;]*/, '');
+    const obj = JSON.parse(jsonText);
+    return { lesson: obj, wrapper:{has:true,before,after} };
+  }
+
+  function loadFromJSONObj(obj){
+    LESSON = obj.lessonData || obj;
+    if (!LESSON || typeof LESSON !== 'object') throw new Error('Could not find a valid object. Paste either the lesson object or {"lessonData": ...}');
+    RECORDS = []; LOCALES = new Set();
+    collectLocales(LESSON);
+    RECORDS = collectTranslatables(LESSON);
+    populateLocaleSelects();
+
+    const totalQ = Array.isArray(LESSON.questions) ? LESSON.questions.length : 0;
+    $('#qTotal').textContent = `${totalQ} questions detected`;
+
+    try{
+      const urlParams = new URLSearchParams(location.search);
+      const lang = urlParams.get('lang');
+      const showMeta = urlParams.get('showMeta');
+      if (lang) {
+        const sel = $('#localeSelect');
+        if ([...sel.options].some(o => o.value === lang)) sel.value = lang;
+      }
+      $('#hideMeta').checked = !(showMeta === '1' || showMeta === 'true');
+    }catch{}
+    setUrlLangParam($('#localeSelect').value);
+
+    renderTable();
+    markClean(); // freshly loaded state
+  }
+
+  // ---------- GitHub integration with single-flight save ----------
+  const ghStatus = (msg, cls='') => {
+    const el = $('#ghStatus');
+    el.textContent = msg || '';
+    el.className = `status ${cls}`;
+  };
+  function ghReadToken(){
+    GITHUB.token = $('#ghToken').value.trim();
+    try { localStorage.setItem('ghToken', GITHUB.token || ''); } catch {}
+  }
+  async function withAuthTry(fn){
+    const t = (GITHUB.token||'').trim();
+    if (!t) throw new Error('Personal Access Token required.');
+    try { return await fn({ Authorization: `Bearer ${t}` }); }
+    catch (e1) {
+      const msg = String(e1 && e1.message || '');
+      if (!msg.includes('401')) throw e1;
+      return await fn({ Authorization: `token ${t}` });
+    }
+  }
+  async function fetchSha(headers){
+    const url = `https://api.github.com/repos/${encodeURIComponent(GITHUB.owner)}/${encodeURIComponent(GITHUB.repo)}/contents/${encodeURIComponent(GITHUB.path)}?ref=${encodeURIComponent(GITHUB.branch)}`;
+    const res = await fetch(url, { headers });
+    if (res.status === 404) return '';
+    if (!res.ok){ const t = await res.text().catch(()=> ''); throw new Error(`Pre-save sha fetch failed (${res.status}): ${t || res.statusText}`); }
+    const data = await res.json();
+    return data.sha || '';
+  }
+  function computeContentB64(){
+    const ensure = $('#ensureKeys').checked;
+    const locale = $('#localeSelect').value;
+    if (ensure){ for (const rec of RECORDS){ if (!(locale in rec.node)) rec.node[locale] = rec.node?.en_US ?? rec.node?.basic ?? ''; } }
+    const json = JSON.stringify(LESSON, null, 2);
+    const contentText = WRAPPER.has ? ('var lessonData = ' + json + ';\n') : json;
+    return toB64Utf8(contentText);
+  }
+  function setSavingUI(saving){
+    const btn = $('#btnGHSave');
+    if (saving){ btn.setAttribute('disabled',''); ghStatus('Saving…', 'saving'); }
+    else { btn.removeAttribute('disabled'); }
+  }
+  async function performSaveOnce(headers){
+    // skip if nothing changed
+    const b64 = computeContentB64();
+    if (b64 === lastSavedB64){
+      ghStatus('No changes to save.');
+      return;
+    }
+    let sha = '';
+    try { sha = await fetchSha(headers); } catch(e){ ghStatus(e.message, 'error'); return; }
+
+    const body = { message:'Update lesson translations', content: b64, branch: GITHUB.branch, ...(sha ? { sha } : {}) };
+    const url = `https://api.github.com/repos/${encodeURIComponent(GITHUB.owner)}/${encodeURIComponent(GITHUB.repo)}/contents/${encodeURIComponent(GITHUB.path)}`;
+
+    let res = await fetch(url, { method:'PUT', headers, body: JSON.stringify(body) });
+    if (res.status === 409){
+      // out-of-date SHA: refresh and retry once
+      try { sha = await fetchSha(headers); } catch(e){ ghStatus('Retry failed fetching sha: ' + e.message, 'error'); return; }
+      const body2 = { ...body, ...(sha ? { sha } : {}) };
+      res = await fetch(url, { method:'PUT', headers, body: JSON.stringify(body2) });
+    }
+    if (!res.ok){
+      const t = await res.text().catch(()=> '');
+      let msg = t; try { msg = JSON.parse(t).message || msg; } catch {}
+      if (res.status === 401) { ghStatus('401 Unauthorized: check token type/scopes and repo access. ' + msg, 'error'); return; }
+      if (res.status === 403) { ghStatus('403 Forbidden: Branch protection or missing Contents: Read & write. ' + msg, 'error'); return; }
+      if (res.status === 404) { ghStatus('404 Not Found: repo/branch/path not accessible for this token. ' + msg, 'error'); return; }
+      ghStatus(`Save failed (${res.status}): ${msg || res.statusText}`, 'error'); return;
+    }
+    const out = await res.json();
+    GITHUB.sha = out?.content?.sha || sha;
+    lastSavedB64 = b64;
+    ghStatus('Saved ✔', 'saving');
+    markClean();
+  }
+  async function saveQueuedOnce(){
+    // queue new saves while one is running; then flush exactly one more time
+    if (isSaving){ saveQueued = true; return; }
+    isSaving = true; setSavingUI(true);
+    try{
+      await withAuthTry(async (auth) => {
+        const headers = { 'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json', ...auth };
+        await performSaveOnce(headers);
+      });
+    } finally {
+      isSaving = false; setSavingUI(false);
+      if (saveQueued){ saveQueued = false; // flush one more save if requested during flight
+        await saveQueuedOnce();
+      }
+    }
+  }
+
+  // Public save API (button / hotkey / auto-save use this)
+  async function githubSave(){ ghReadToken(); await saveQueuedOnce(); }
+
+  async function githubLoad(){
+    ghReadToken(); ghStatus('Loading…');
+    await withAuthTry(async (auth) => {
+      const headers = { 'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28', ...auth };
+      const url = `https://api.github.com/repos/${encodeURIComponent(GITHUB.owner)}/${encodeURIComponent(GITHUB.repo)}/contents/${encodeURIComponent(GITHUB.path)}?ref=${encodeURIComponent(GITHUB.branch)}`;
+      const res = await fetch(url, { headers });
+      if (res.status === 404){ ghStatus('File not found on repo/branch. Click “Save to GitHub” to create it.'); GITHUB.sha=''; lastSavedB64=''; return; }
+      if (!res.ok){ ghStatus(`Error ${res.status}: ${await res.text().catch(()=>res.statusText)}`, 'error'); return; }
+      const data = await res.json();
+      if (!data.content){ ghStatus('No content in response.', 'error'); return; }
+      GITHUB.sha = data.sha;
+      const text = fromB64Utf8(data.content);
+      $('#jsonInput').value = text;
+      try {
+        const {lesson, wrapper} = extractLessonFromText(text);
+        WRAPPER = wrapper;
+        loadFromJSONObj(lesson);
+        lastSavedB64 = toB64Utf8(WRAPPER.has ? ('var lessonData = ' + JSON.stringify(LESSON, null, 2) + '\n') : JSON.stringify(LESSON, null, 2));
+        ghStatus('Loaded ✔');
+      } catch(e){ ghStatus('Fetched, but parse failed: ' + e.message, 'error'); }
+    });
+  }
+
+  // Dirty tracking for auto-save
+  let dirty = false;
+  let autosaveTimer = null;
+  function touchDirty(){
+    dirty = true;
+    if (!$('#autoSave').checked) return;
+    if (autosaveTimer) clearTimeout(autosaveTimer);
+    autosaveTimer = setTimeout(() => {
+      if (dirty) githubSave();
+    }, 1200);
+  }
+  function markClean(){
+    dirty = false;
+    if (autosaveTimer) { clearTimeout(autosaveTimer); autosaveTimer=null; }
+  }
+
+  // ---------- UI bindings ----------
+  $('#btnLoadTextarea').addEventListener('click', () => {
+    try{
+      const raw = $('#jsonInput').value.trim();
+      if (!raw) { alert('Paste JSON first.'); return; }
+      const {lesson, wrapper} = extractLessonFromText(raw);
+      WRAPPER = wrapper;
+      loadFromJSONObj(lesson);
+      lastSavedB64 = ''; // unknown
+      ghStatus('Loaded from textarea ✔');
+    } catch (e) {
+      alert('Invalid input: ' + e.message);
+    }
+  });
+
+  $('#btnDownload').addEventListener('click', () => {
+    const ensure = $('#ensureKeys').checked;
+    const locale = $('#localeSelect').value;
+    if (!LESSON){ alert('Load JSON first.'); return; }
+    if (ensure){ for (const rec of RECORDS){ if (!(locale in rec.node)) rec.node[locale] = rec.node?.en_US ?? rec.node?.basic ?? ''; } }
+    const json = JSON.stringify(LESSON, null, 2);
+    if (WRAPPER.has){
+      const wrapped = 'var lessonData = ' + json + ';\n';
+      download('translation.wrapped.js', wrapped, 'text/javascript');
+    } else {
+      download('lessonData.updated.json', json);
+    }
+  });
+
+  $('#btnCSV').addEventListener('click', () => {
+    // Rebuild CSV from current UI
+    const locale = $('#localeSelect').value;
+    const base = $('#baseSelect').value;
+    const hideMeta = $('#hideMeta').checked;
+    const rows = [];
+    let idx = 0;
+    RECORDS.forEach(rec => {
+      if (hideMeta && /\.(explanationText|rightAnswerText|wrongAnswerText)$/.test(rec.path)) return;
+      const baseText = rec.node?.[base] ?? '';
+      const locText  = rec.node?.[locale] ?? '';
+      rows.push({ idx: ++idx, qnum: rec.qIndex+1, item: labelFor(rec), path: rec.path, baseLocale: base, base: baseText, locale, value: locText });
+    });
+    if (!rows.length){ alert('Nothing to export. Load JSON first.'); return; }
+    downloadCSV('lesson_strings.csv', rows);
+  });
+
+  $('#localeSelect').addEventListener('change', () => {
+    setUrlLangParam($('#localeSelect').value);
+    renderTable(); updateCounts();
+  });
+  $('#baseSelect').addEventListener('change', () => { renderTable(); updateCounts(); });
+  $('#missingOnly').addEventListener('change', () => { renderTable(); updateCounts(); });
+  $('#search').addEventListener('input', renderTable);
+  $('#hideMeta').addEventListener('change', () => { renderTable(); updateCounts(); });
+
+  $('#btnExpandAll').addEventListener('click', () => {
+    collapsed.clear(); storage.set('collapsedQs', Array.from(collapsed)); renderTable();
+  });
+  $('#btnCollapseAll').addEventListener('click', () => {
+    const count = QINFO.length;
+    collapsed = new Set(Array.from({length:count}, (_,i)=>i));
+    storage.set('collapsedQs', Array.from(collapsed)); renderTable();
+  });
+
+  // Save / Load
+  $('#btnGHLoad').addEventListener('click', () => { githubLoad().catch(e=>ghStatus('Load error: '+e.message, 'error')); });
+  $('#btnGHSave').addEventListener('click', () => { githubSave().catch(e=>ghStatus('Save error: '+e.message, 'error')); });
+
+  // Hotkey: Ctrl/Cmd+S
+  window.addEventListener('keydown', (e) => {
+    const isMetaS = (e.key === 's' || e.key === 'S') && (e.ctrlKey || e.metaKey);
+    if (isMetaS){
+      e.preventDefault();
+      githubSave();
+    }
+  });
+
+  // Paste-to-load anywhere
+  window.addEventListener('paste', (e) => {
+    const text = (e.clipboardData || window.clipboardData)?.getData('text');
+    if (!text) return;
+    try {
+      const obj = JSON.parse(text);
+      if (obj && typeof obj === 'object') {
+        LESSON = obj.lessonData || obj;
+        WRAPPER = {has:false,before:'',after:''};
+        loadFromJSONObj(LESSON);
+        $('#jsonInput').value = JSON.stringify(obj, null, 2);
+        lastSavedB64 = '';
+        ghStatus('JSON loaded from paste ✔');
+      }
+    } catch {}
+  });
+
+  // Persist Auto-save preference
+  $('#autoSave').checked = !!storage.get('autoSave', false);
+  $('#autoSave').addEventListener('change', () => storage.set('autoSave', $('#autoSave').checked));
+
+  function debounced(fn, ms=400){ let t; return (...args)=>{ clearTimeout(t); t=setTimeout(()=>fn(...args), ms); }; }
+  const tokenInput = $('#ghToken');
+  tokenInput.addEventListener('input', debounced(() => { ghReadToken(); if (GITHUB.token) githubLoad().catch(e=>ghStatus('Load error: '+e.message, 'error')); }, 500));
+
+  // Init auto-load
+  (function initAutoLoad(){
+    try{
+      const p = new URLSearchParams(location.search);
+      const showMeta = p.get('showMeta');
+      $('#hideMeta').checked = !(showMeta === '1' || showMeta === 'true');
+    }catch{}
+
+    if (typeof window.LESSON !== 'undefined') { try { loadFromJSONObj(window.LESSON); ghStatus('Loaded from global LESSON ✔'); return; } catch {} }
+    if (typeof window.lessonData !== 'undefined') { try { loadFromJSONObj(window.lessonData); ghStatus('Loaded from global lessonData ✔'); return; } catch {} }
+
+    const raw = $('#jsonInput').value.trim();
+    if (raw) { try { const {lesson, wrapper} = extractLessonFromText(raw); WRAPPER = wrapper; loadFromJSONObj(lesson); ghStatus('Loaded from textarea ✔'); return; } catch {} }
+
+    try {
+      const saved = localStorage.getItem('ghToken') || '';
+      if (saved) { tokenInput.value = saved; GITHUB.token = saved; githubLoad().catch(e=>ghStatus('Load error: '+e.message, 'error')); }
+      else { ghStatus('Tip: paste a PAT to auto-load from GitHub.'); }
+    } catch { ghStatus('Ready. Paste JSON or enter a PAT to load from GitHub.'); }
+  })();
+})();
+</script>
 </body>
 </html>
